@@ -213,6 +213,7 @@ function dealCards(state) {
     postBlind(state, bb, BIG_BLIND);
 
     state.currentBet = BIG_BLIND;
+    state.actedThisRound = 0; // Track how many have acted this betting round
 
     // First to act preflop (UTG, which is after BB... in heads-up that's the SB/dealer)
     if (state.players.length === 2) {
@@ -222,6 +223,7 @@ function dealCards(state) {
     }
 
     state.lastRaise = bb; // BB is the last "raiser" initially
+    console.log(`Deal: SB=${sb}, BB=${bb}, first to act=${state.currentPlayer}`);
 
     return state;
 }
@@ -280,6 +282,7 @@ function handlePlayerAction(state, playerIdx, action, amount = 0) {
     if (action === 'fold') {
         player.folded = true;
         state.message = `${player.name} folds`;
+        state.actedThisRound++; // Player has acted
 
         // Check if only one player left
         const remaining = activePlayers(state);
@@ -293,6 +296,7 @@ function handlePlayerAction(state, playerIdx, action, amount = 0) {
             return state;
         }
         state.message = `${player.name} checks`;
+        state.actedThisRound++; // Player has acted
     }
     else if (action === 'call') {
         const callAmount = Math.min(toCall, player.chips);
@@ -301,6 +305,7 @@ function handlePlayerAction(state, playerIdx, action, amount = 0) {
         state.pot += callAmount;
         player.allIn = player.chips === 0;
         state.message = `${player.name} calls ${callAmount}`;
+        state.actedThisRound++; // Player has acted
     }
     else if (action === 'raise') {
         // amount = total bet size
@@ -321,6 +326,10 @@ function handlePlayerAction(state, playerIdx, action, amount = 0) {
         state.lastRaise = playerIdx;
         player.allIn = player.chips === 0;
         state.message = `${player.name} raises to ${amount}`;
+
+        // Reset action counter because a raise re-opens betting for everyone else
+        // The raiser has acted, so count starts at 1
+        state.actedThisRound = 1;
     }
     else if (action === 'allin') {
         const allInAmount = player.chips;
@@ -328,9 +337,13 @@ function handlePlayerAction(state, playerIdx, action, amount = 0) {
         player.bet += allInAmount;
         state.pot += allInAmount;
         player.allIn = true;
+
         if (player.bet > state.currentBet) {
             state.currentBet = player.bet;
             state.lastRaise = playerIdx;
+            state.actedThisRound = 1; // Treat as raise
+        } else {
+            state.actedThisRound++; // Treat as call/check
         }
         state.message = `${player.name} all-in!`;
     }
@@ -353,20 +366,23 @@ function isBettingRoundOver(state) {
     const active = activeNonAllIn(state);
 
     // Only 0 or 1 players can act
-    if (active.length <= 1) return true;
+    if (active.length <= 1) {
+        console.log("Round over: 1 or fewer active players");
+        return true;
+    }
 
     // All bets must be equal
-    const bets = active.map(p => p.bet);
-    const allEqual = bets.every(b => b === state.currentBet);
-    if (!allEqual) return false;
+    const allEqual = active.every(p => p.bet === state.currentBet);
+    if (!allEqual) {
+        console.log(`Round NOT over: bets not equal (currentBet=${state.currentBet})`);
+        return false;
+    }
 
-    // Everyone must have had a chance to act since last raise
-    // In a round, after a raise, all others must respond
-    // If we've gone around to the lastRaise player, round is over
-    const next = nextActivePlayer(state, state.currentPlayer);
-    if (next === state.lastRaise || next === -1) return true;
+    // All active players must have acted this round
+    const allActed = state.actedThisRound >= active.length;
+    console.log(`Round check: actedThisRound=${state.actedThisRound}, activeCount=${active.length}, allActed=${allActed}`);
 
-    return false;
+    return allActed;
 }
 
 function advancePhase(state) {
@@ -375,6 +391,7 @@ function advancePhase(state) {
     // Reset bets for new round
     state.players.forEach(p => p.bet = 0);
     state.currentBet = 0;
+    state.actedThisRound = 0; // Reset action counter
 
     if (state.phase === 'preflop') {
         state.phase = 'flop';
