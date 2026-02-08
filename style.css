@@ -61,8 +61,8 @@ body {
     max-width: 350px;
     /* Slight increase for padding */
 
-    background: rgba(0, 0, 0, 0.75);
-    backdrop-filter: blur(8px);
+    background: rgba(0, 0, 0, 0.85) !important;
+    backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(8px);
     padding: 30px;
     border-radius: 16px;

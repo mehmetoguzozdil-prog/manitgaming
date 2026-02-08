@@ -582,6 +582,7 @@ function loadSavedNames() {
     const db = getDB();
     onValue(ref(db, 'playerNames'), (snap) => {
         const names = snap.val();
+        console.log("Loaded saved names:", names);
         if (!names) return;
         const datalist = document.getElementById('saved-names');
         if (datalist) {
@@ -715,14 +716,19 @@ const inpPlayerName = document.getElementById('player-name');
 const chkSaveName = document.getElementById('save-name-default');
 
 btnCreate.addEventListener('click', async () => {
+    const name = inpPlayerName.value.trim();
+    if (!name) {
+        lobbyMsg.textContent = "Please enter your name!";
+        return;
+    }
+
     btnCreate.disabled = true;
     lobbyMsg.textContent = "Creating...";
     try {
-        const name = inpPlayerName.value.trim();
         if (chkSaveName.checked) saveName(name);
 
         const count = parseInt(playerCountSelect.value);
-        const roomId = await createRoom(count, name || "Player 1");
+        const roomId = await createRoom(count, name);
         enterGame(roomId, 0);
     } catch (e) {
         console.error(e);
@@ -734,6 +740,12 @@ btnCreate.addEventListener('click', async () => {
 btnJoin.addEventListener('click', async () => {
     const code = inpRoomCode.value.trim().toUpperCase();
     if (code.length < 4) return;
+
+    const name = inpPlayerName.value.trim();
+    if (!name) {
+        lobbyMsg.textContent = "Please enter your name!";
+        return;
+    }
 
     lobbyMsg.textContent = "Joining...";
     const db = getDB();
@@ -756,10 +768,9 @@ btnJoin.addEventListener('click', async () => {
         return;
     }
 
-    const name = inpPlayerName.value.trim();
     if (chkSaveName.checked) saveName(name);
 
-    const ok = await joinRoom(code, slot, name || `Player ${slot + 1}`);
+    const ok = await joinRoom(code, slot, name);
     if (ok) enterGame(code, slot);
     else lobbyMsg.textContent = "Failed to join";
 });
