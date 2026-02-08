@@ -388,6 +388,10 @@ function isBettingRoundOver(state) {
 function advancePhase(state) {
     console.log(`Advancing from ${state.phase}`);
 
+    // Safety checks for Firebase arrays
+    if (!state.community) state.community = [];
+    if (!state.deck) state.deck = [];
+
     // Reset bets for new round
     state.players.forEach(p => p.bet = 0);
     state.currentBet = 0;
@@ -395,20 +399,26 @@ function advancePhase(state) {
 
     if (state.phase === 'preflop') {
         state.phase = 'flop';
-        state.deck.pop(); // Burn
-        state.community.push(state.deck.pop(), state.deck.pop(), state.deck.pop());
+        if (state.deck.length >= 3) {
+            state.deck.pop(); // Burn
+            state.community.push(state.deck.pop(), state.deck.pop(), state.deck.pop());
+        }
         state.message = 'Flop';
     }
     else if (state.phase === 'flop') {
         state.phase = 'turn';
-        state.deck.pop(); // Burn
-        state.community.push(state.deck.pop());
+        if (state.deck.length >= 1) {
+            state.deck.pop(); // Burn
+            state.community.push(state.deck.pop());
+        }
         state.message = 'Turn';
     }
     else if (state.phase === 'turn') {
         state.phase = 'river';
-        state.deck.pop(); // Burn
-        state.community.push(state.deck.pop());
+        if (state.deck.length >= 1) {
+            state.deck.pop(); // Burn
+            state.community.push(state.deck.pop());
+        }
         state.message = 'River';
     }
     else if (state.phase === 'river') {
