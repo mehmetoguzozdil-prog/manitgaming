@@ -5,12 +5,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Heads Up Poker</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
     <div id="app">
+        <div id="debug-log"
+            style="position:fixed; top:0; left:0; width:100%; height:50px; background:rgba(255,0,0,0.8); color:white; z-index:9999; overflow:auto; display:none; font-size:12px;">
+        </div>
+        <script>
+            window.addEventListener('error', (e) => {
+                const d = document.getElementById('debug-log');
+                d.style.display = 'block';
+                d.innerText += "Error: " + e.message + " at " + e.filename + ":" + e.lineno + "\n";
+            });
+            window.addEventListener('unhandledrejection', (e) => {
+                const d = document.getElementById('debug-log');
+                d.style.display = 'block';
+                d.innerText += "Promise Error: " + e.reason + "\n";
+            });
+        </script>
         <!-- Lobby Screen -->
         <div id="lobby" class="screen active">
             <h1>PvP Poker</h1>
