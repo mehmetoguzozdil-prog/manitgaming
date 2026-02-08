@@ -617,16 +617,29 @@ function handleUserAction(action) {
         slider.min = Math.min(minRaise, maxBet);
         slider.max = maxBet;
         slider.value = slider.min;
-        raiseVal.textContent = slider.value;
+        raiseVal.value = slider.min;
+        raiseVal.min = slider.min;
+        raiseVal.max = slider.max;
         sliderContainer.style.display = 'flex';
         return;
     }
     sendAction(myRoomId, myPlayerIndex, action, 0);
 }
 
-slider.addEventListener('input', () => { raiseVal.textContent = slider.value; });
+slider.addEventListener('input', () => {
+    raiseVal.value = slider.value;
+});
+
+raiseVal.addEventListener('input', () => {
+    let val = parseInt(raiseVal.value) || 0;
+    val = Math.max(parseInt(slider.min), Math.min(parseInt(slider.max), val));
+    slider.value = val;
+    raiseVal.value = val;
+});
+
 btnConfirmRaise.addEventListener('click', () => {
-    sendAction(myRoomId, myPlayerIndex, 'raise', parseInt(slider.value));
+    const val = parseInt(raiseVal.value) || parseInt(slider.value);
+    sendAction(myRoomId, myPlayerIndex, 'raise', val);
     sliderContainer.style.display = 'none';
 });
 

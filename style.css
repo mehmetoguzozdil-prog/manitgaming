@@ -330,10 +330,22 @@ input {
 }
 
 #raise-val {
-    min-width: 50px;
+    width: 70px;
+    padding: 8px;
     text-align: center;
     font-weight: bold;
     color: var(--accent-gold);
+    background: #333;
+    border: 1px solid var(--accent-gold);
+    border-radius: 6px;
+    font-size: 1rem;
+    -moz-appearance: textfield;
+}
+
+#raise-val::-webkit-outer-spin-button,
+#raise-val::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
 }
 
 #btn-confirm-raise {
