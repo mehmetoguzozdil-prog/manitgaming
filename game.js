@@ -1,8 +1,8 @@
 // ============================================
-// FIREBASE IMPORTS (ES Modules)
+// FIREBASE ES MODULE IMPORTS
 // ============================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 // ============================================
 // FIREBASE CONFIG
@@ -18,25 +18,28 @@ const firebaseConfig = {
 };
 
 // ============================================
-// FIREBASE INITIALIZATION
+// FIREBASE INITIALIZATION (Exactly Once)
 // ============================================
+console.log("Initializing Firebase app...");
 const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+console.log("Firebase app initialized:", app.name);
 
-// Connection test - write to rooms/testRoom
-set(ref(db, 'rooms/testRoom'), { connected: true, timestamp: Date.now() })
-    .then(() => console.log("Firebase connection verified."))
-    .catch((e) => console.error("Firebase connection failed:", e));
+console.log("Getting database instance...");
+const database = getDatabase(app);
+console.log("Database instance obtained:", database);
+
+// Connection verification - write to rooms/ping
+const pingRef = ref(database, 'rooms/ping');
+set(pingRef, { connected: true, timestamp: Date.now() })
+    .then(() => console.log("Firebase connection verified - wrote to rooms/ping"))
+    .catch((e) => console.error("Firebase write failed:", e));
 
 // ============================================
-// POKER LOGIC (Inline)
+// POKER LOGIC
 // ============================================
 const SUITS = ['hearts', 'diamonds', 'clubs', 'spades'];
 const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-const RANK_VALUES = {
-    '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
-    'J': 11, 'Q': 12, 'K': 13, 'A': 14
-};
+const RANK_VALUES = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14 };
 
 class Deck {
     constructor() { this.cards = []; this.reset(); }
@@ -121,7 +124,7 @@ function score5CardHand(cards) {
 }
 
 // ============================================
-// GAME ENGINE (Inline)
+// GAME ENGINE
 // ============================================
 const PHASES = { PRE_FLOP: 'pre-flop', FLOP: 'flop', TURN: 'turn', RIVER: 'river', SHOWDOWN: 'showdown', GAME_OVER: 'game-over' };
 
@@ -221,40 +224,56 @@ function generateRoomId() { return Math.random().toString(36).substring(2, 8).to
 async function createRoom() {
     const roomId = generateRoomId();
     const initialState = createInitialState();
-    await set(ref(db, 'rooms/' + roomId), initialState);
+    const roomRef = ref(database, 'rooms/' + roomId);
+    await set(roomRef, initialState);
+    console.log("Room created:", roomId);
     return roomId;
 }
 
 function subscribeToRoom(roomId, callback) {
-    const roomRef = ref(db, 'rooms/' + roomId);
-    onValue(roomRef, (snapshot) => { const data = snapshot.val(); callback(data); });
+    const roomRef = ref(database, 'rooms/' + roomId);
+    onValue(roomRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) callback(data);
+    });
 }
 
 async function updateRoomState(roomId, newState) {
-    await set(ref(db, 'rooms/' + roomId), newState);
+    const roomRef = ref(database, 'rooms/' + roomId);
+    await set(roomRef, newState);
 }
 
 async function sendAction(roomId, playerIndex, action, amount) {
-    // Read current state, apply action, write back
-    // Using set for simplicity (onValue will sync)
-    const roomRef = ref(db, 'rooms/' + roomId);
-    onValue(roomRef, async (snapshot) => {
+    const roomRef = ref(database, 'rooms/' + roomId);
+    try {
+        const snapshot = await get(roomRef);
         const currentState = snapshot.val();
-        if (!currentState) return;
+        if (!currentState) {
+            console.error("Room not found:", roomId);
+            return;
+        }
         const newState = handleAction(JSON.parse(JSON.stringify(currentState)), playerIndex, action, amount);
         await set(roomRef, newState);
-    }, { onlyOnce: true });
+    } catch (e) {
+        console.error("sendAction failed:", e);
+    }
 }
 
 async function triggerStartGame(roomId) {
-    const roomRef = ref(db, 'rooms/' + roomId);
-    onValue(roomRef, async (snapshot) => {
+    const roomRef = ref(database, 'rooms/' + roomId);
+    try {
+        const snapshot = await get(roomRef);
         const currentState = snapshot.val();
-        if (!currentState) return;
+        if (!currentState) {
+            console.error("Room not found:", roomId);
+            return;
+        }
         const newState = startHand(JSON.parse(JSON.stringify(currentState)));
         newState.status = 'playing';
         await set(roomRef, newState);
-    }, { onlyOnce: true });
+    } catch (e) {
+        console.error("triggerStartGame failed:", e);
+    }
 }
 
 // ============================================
@@ -288,7 +307,7 @@ btnCreate.addEventListener('click', async () => {
         const roomId = await createRoom();
         enterGame(roomId, 0);
     } catch (e) {
-        console.error(e);
+        console.error("Create room error:", e);
         lobbyMsg.textContent = "Error creating room.";
         btnCreate.disabled = false;
     }
@@ -307,7 +326,6 @@ function enterGame(roomId, playerIndex) {
     screenGame.classList.add('active');
     displayRoomCode.textContent = roomId;
     subscribeToRoom(roomId, (state) => {
-        if (!state) return;
         gameState = state;
         renderGame(state);
     });
@@ -318,8 +336,9 @@ function enterGame(roomId, playerIndex) {
 // ============================================
 function renderGame(state) {
     if (state.status === 'waiting') {
-        if (myPlayerIndex === 1 && state.status === 'waiting') triggerStartGame(myRoomId);
-        if (state.status === 'waiting') { potEl.textContent = "Waiting for opponent..."; return; }
+        if (myPlayerIndex === 1) triggerStartGame(myRoomId);
+        potEl.textContent = "Waiting for opponent...";
+        return;
     }
     potEl.textContent = state.pot;
     const me = state.players[myPlayerIndex], opponent = state.players[(myPlayerIndex + 1) % 2];
@@ -400,3 +419,5 @@ function updateControls(state, me) {
         else { btnCall.disabled = true; btnCheck.disabled = false; btnCall.textContent = "Call"; }
     }
 }
+
+console.log("game.js loaded successfully");
