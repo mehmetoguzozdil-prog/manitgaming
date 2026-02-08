@@ -20,19 +20,44 @@ const firebaseConfig = {
 // ============================================
 // FIREBASE INITIALIZATION (Exactly Once)
 // ============================================
-console.log("Initializing Firebase app...");
-const app = initializeApp(firebaseConfig);
-console.log("Firebase app initialized:", app.name);
+let firebaseApp = null;
+let database = null;
 
-console.log("Getting database instance...");
-const database = getDatabase(app);
-console.log("Database instance obtained:", database);
+function initFirebase() {
+    console.log("Step 1: Initializing Firebase app...");
+    firebaseApp = initializeApp(firebaseConfig);
+    console.log("Step 2: Firebase app initialized:", firebaseApp);
+    console.log("Step 3: App name:", firebaseApp.name);
 
-// Connection verification - write to rooms/ping
-const pingRef = ref(database, 'rooms/ping');
-set(pingRef, { connected: true, timestamp: Date.now() })
-    .then(() => console.log("Firebase connection verified - wrote to rooms/ping"))
-    .catch((e) => console.error("Firebase write failed:", e));
+    console.log("Step 4: Getting database instance with app...");
+    database = getDatabase(firebaseApp);
+    console.log("Step 5: Database instance:", database);
+    console.log("Step 6: Database defined?", database !== undefined && database !== null);
+
+    // Connection verification
+    console.log("Step 7: Creating test ref...");
+    const testRef = ref(database, "debug/ping");
+    console.log("Step 8: Test ref created:", testRef);
+
+    console.log("Step 9: Writing to debug/ping...");
+    set(testRef, { connected: true, timestamp: Date.now() })
+        .then(() => console.log("Step 10: Firebase connection verified!"))
+        .catch((e) => console.error("Firebase write error:", e));
+}
+
+// Initialize Firebase immediately
+initFirebase();
+
+// ============================================
+// HELPER: Get database with safety check
+// ============================================
+function getDB() {
+    if (!database) {
+        console.error("ERROR: Database not initialized!");
+        throw new Error("Database not initialized");
+    }
+    return database;
+}
 
 // ============================================
 // POKER LOGIC
@@ -222,55 +247,65 @@ function endHand(state, winnerId) {
 function generateRoomId() { return Math.random().toString(36).substring(2, 8).toUpperCase(); }
 
 async function createRoom() {
+    const db = getDB();
     const roomId = generateRoomId();
     const initialState = createInitialState();
-    const roomRef = ref(database, 'rooms/' + roomId);
+    const roomRef = ref(db, 'rooms/' + roomId);
+    console.log("Creating room with ref:", roomRef);
     await set(roomRef, initialState);
     console.log("Room created:", roomId);
     return roomId;
 }
 
 function subscribeToRoom(roomId, callback) {
-    const roomRef = ref(database, 'rooms/' + roomId);
+    const db = getDB();
+    const roomRef = ref(db, 'rooms/' + roomId);
+    console.log("Subscribing to room:", roomId);
     onValue(roomRef, (snapshot) => {
         const data = snapshot.val();
+        console.log("Room data received:", data ? "yes" : "no");
         if (data) callback(data);
     });
 }
 
-async function updateRoomState(roomId, newState) {
-    const roomRef = ref(database, 'rooms/' + roomId);
-    await set(roomRef, newState);
-}
-
 async function sendAction(roomId, playerIndex, action, amount) {
-    const roomRef = ref(database, 'rooms/' + roomId);
+    const db = getDB();
+    const roomRef = ref(db, 'rooms/' + roomId);
     try {
+        console.log("sendAction: Getting current state...");
         const snapshot = await get(roomRef);
         const currentState = snapshot.val();
         if (!currentState) {
             console.error("Room not found:", roomId);
             return;
         }
+        console.log("sendAction: Applying action...");
         const newState = handleAction(JSON.parse(JSON.stringify(currentState)), playerIndex, action, amount);
+        console.log("sendAction: Writing new state...");
         await set(roomRef, newState);
+        console.log("sendAction: Done");
     } catch (e) {
         console.error("sendAction failed:", e);
     }
 }
 
 async function triggerStartGame(roomId) {
-    const roomRef = ref(database, 'rooms/' + roomId);
+    const db = getDB();
+    const roomRef = ref(db, 'rooms/' + roomId);
     try {
+        console.log("triggerStartGame: Getting current state...");
         const snapshot = await get(roomRef);
         const currentState = snapshot.val();
         if (!currentState) {
             console.error("Room not found:", roomId);
             return;
         }
+        console.log("triggerStartGame: Starting hand...");
         const newState = startHand(JSON.parse(JSON.stringify(currentState)));
         newState.status = 'playing';
+        console.log("triggerStartGame: Writing new state...");
         await set(roomRef, newState);
+        console.log("triggerStartGame: Done");
     } catch (e) {
         console.error("triggerStartGame failed:", e);
     }
