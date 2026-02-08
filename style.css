@@ -632,16 +632,25 @@ input {
 @media (max-width: 600px) {
     #music-player {
         width: 100%;
-        bottom: 0;
+        top: 0;
+        /* Move to top */
+        bottom: auto;
+        /* Reset bottom */
         left: 0;
-        border-radius: 12px 12px 0 0;
-        padding: 10px;
+        border-radius: 0 0 12px 12px;
+        /* Rounded bottom corners */
+        padding: 8px 15px;
         flex-direction: row;
         align-items: center;
         justify-content: space-between;
-        border-bottom: none;
-        border-left: none;
-        border-right: none;
+        border: none;
+        border-bottom: 1px solid var(--accent-gold);
+        background: rgba(0, 0, 0, 0.9);
+    }
+
+    /* Push content down so it's not covered by player */
+    #app {
+        padding-top: 50px;
     }
 
     .track-info {

@@ -578,19 +578,66 @@ async function saveName(name) {
     }
 }
 
+// Custom Dropdown Logic
+const btnToggleNames = document.getElementById('btn-toggle-names');
+const customNameList = document.getElementById('custom-name-list');
+
+if (btnToggleNames && customNameList) {
+    btnToggleNames.addEventListener('click', (e) => {
+        e.stopPropagation();
+        customNameList.style.display = customNameList.style.display === 'block' ? 'none' : 'block';
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!processClick(e)) return;
+    });
+
+    function processClick(e) {
+        if (customNameList.style.display === 'block' &&
+            !customNameList.contains(e.target) &&
+            e.target !== btnToggleNames) {
+            customNameList.style.display = 'none';
+        }
+        return true;
+    }
+}
+
 function loadSavedNames() {
     const db = getDB();
     onValue(ref(db, 'playerNames'), (snap) => {
         const names = snap.val();
         console.log("Loaded saved names:", names);
-        if (!names) return;
-        const datalist = document.getElementById('saved-names');
-        if (datalist) {
-            datalist.innerHTML = '';
+
+        const listContainer = document.getElementById('custom-name-list');
+        if (listContainer) {
+            listContainer.innerHTML = '';
+            if (!names) {
+                const empty = document.createElement('div');
+                empty.textContent = "No saved names";
+                empty.style.padding = "10px";
+                empty.style.color = "#888";
+                listContainer.appendChild(empty);
+                return;
+            }
+
             Object.values(names).forEach(n => {
-                const opt = document.createElement('option');
-                opt.value = n;
-                datalist.appendChild(opt);
+                const item = document.createElement('div');
+                item.textContent = n;
+                item.style.padding = "12px";
+                item.style.cursor = "pointer";
+                item.style.borderBottom = "1px solid #333";
+                item.style.color = "#fff";
+
+                item.addEventListener('mouseenter', () => item.style.background = "#444");
+                item.addEventListener('mouseleave', () => item.style.background = "transparent");
+
+                item.addEventListener('click', () => {
+                    const inp = document.getElementById('player-name');
+                    if (inp) inp.value = n;
+                    listContainer.style.display = 'none';
+                });
+
+                listContainer.appendChild(item);
             });
         }
     });
