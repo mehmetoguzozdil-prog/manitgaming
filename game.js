@@ -524,10 +524,43 @@ function showdown(state) {
     state.message = winMsg;
     state.phase = 'finished';
 
-    return state;
+    // Record stats for all active players
+    recordPlayerStats(state, contenders, winners, bestHand);
 
     return state;
 }
+
+async function recordPlayerStats(state, players, winners, bestHand) {
+    try {
+        const db = getDB();
+        for (const p of players) {
+            if (!p.name) continue;
+            const key = p.name.replace(/[.#$/\[\]]/g, "");
+            const statsRef = ref(db, 'playerStats/' + key);
+            const snap = await get(statsRef);
+            let stats = snap.val() || { wins: 0, handsPlayed: 0, bestHandType: -1 };
+
+            stats.handsPlayed++;
+
+            const isWinner = winners.some(w => w.id === p.id);
+            if (isWinner) {
+                stats.wins++;
+            }
+
+            // Record best hand personal record
+            const allCards = [...p.cards, ...state.community];
+            const personalHand = getBestHand(allCards);
+            if (personalHand.type > (stats.bestHandType || -1)) {
+                stats.bestHandType = personalHand.type;
+            }
+
+            await set(statsRef, stats);
+        }
+    } catch (e) {
+        console.error("Failed to record stats:", e);
+    }
+}
+
 
 function endHand(state, winnerId) {
     const winner = state.players.find(p => p.id === winnerId);
@@ -1107,6 +1140,54 @@ volSlider.addEventListener('input', (e) => {
 audioEl.addEventListener('ended', () => {
     loadTrack(currentTrackIdx + 1);
 });
+
+// Modals Logic
+const modalGuide = document.getElementById('modal-guide');
+const modalStats = document.getElementById('modal-stats');
+const btnOpenGuide = document.getElementById('btn-open-guide');
+const btnShowStats = document.getElementById('btn-show-stats');
+const closeButtons = document.querySelectorAll('.btn-close-modal');
+
+if (btnOpenGuide) {
+    btnOpenGuide.addEventListener('click', () => {
+        modalGuide.style.display = 'flex';
+    });
+}
+
+if (btnShowStats) {
+    btnShowStats.addEventListener('click', async () => {
+        const name = inpPlayerName.value.trim();
+        if (!name) {
+            lobbyMsg.textContent = "Enter a name to view stats!";
+            return;
+        }
+        await displayStats(name);
+    });
+}
+
+closeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+        modalGuide.style.display = 'none';
+        modalStats.style.display = 'none';
+    });
+});
+
+async function displayStats(name) {
+    const db = getDB();
+    const key = name.replace(/[.#$/\[\]]/g, "");
+    const snap = await get(ref(db, 'playerStats/' + key));
+    const stats = snap.val() || { wins: 0, handsPlayed: 0, bestHandType: -1 };
+
+    document.getElementById('stats-name').textContent = name;
+    document.getElementById('stats-played').textContent = stats.handsPlayed;
+    document.getElementById('stats-wins').textContent = stats.wins;
+
+    const rate = stats.handsPlayed > 0 ? Math.round((stats.wins / stats.handsPlayed) * 100) : 0;
+    document.getElementById('stats-rate').textContent = rate + "%";
+    document.getElementById('stats-best').textContent = stats.bestHandType !== -1 ? getHandName(stats.bestHandType) : "N/A";
+
+    modalStats.style.display = 'flex';
+}
 
 loadSavedNames(); // Load saved player names
 initDropdown();

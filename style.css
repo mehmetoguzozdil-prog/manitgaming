@@ -671,3 +671,147 @@ input {
         /* Hide volume on mobile to save space */
     }
 }
+
+/* ============ MODALS ============ */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+
+.modal-content {
+    background: #1a1a1a;
+    border: 1px solid var(--accent-gold);
+    border-radius: 16px;
+    padding: 25px;
+    width: 90%;
+    max-width: 450px;
+    max-height: 85vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.modal-content h3 {
+    color: var(--accent-gold);
+    margin-top: 0;
+    margin-bottom: 20px;
+    text-align: center;
+    font-size: 1.5rem;
+}
+
+.hands-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.hands-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #333;
+    font-size: 0.95rem;
+    color: #eee;
+}
+
+.hands-list li span {
+    color: #aeaeae;
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 5px;
+}
+
+.stats-grid div {
+    background: #262626;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 0.85rem;
+    color: #ddd;
+}
+
+.stats-grid span {
+    display: block;
+    color: var(--accent-gold);
+    font-weight: bold;
+    font-size: 1.2rem;
+    margin-top: 5px;
+}
+
+.btn-close-modal {
+    display: block;
+    width: 100%;
+    margin-top: 25px;
+    padding: 12px;
+    background: #333 !important;
+    color: white !important;
+    border-radius: 8px;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+}
+
+/* ============ HEADER BUTTONS ============ */
+#btn-open-guide {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--accent-gold);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border: 1px solid rgba(242, 201, 76, 0.3);
+    transition: all 0.2s;
+    user-select: none;
+}
+
+#btn-open-guide:hover {
+    background: rgba(242, 201, 76, 0.2);
+    border-color: var(--accent-gold);
+}
+
+.secondary-btn {
+    background: transparent !important;
+    border: 1px solid #555 !important;
+    color: #aeaeae !important;
+    font-size: 0.85rem;
+    padding: 8px 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.secondary-btn:hover {
+    border-color: var(--accent-gold) !important;
+    color: var(--accent-gold) !important;
+}
+
+@media (max-width: 600px) {
+    #btn-open-guide {
+        padding: 4px 10px;
+        font-size: 0.75rem;
+    }
+
+    .room-info {
+        font-size: 0.75rem;
+    }
+
+    .pot-info {
+        font-size: 0.75rem;
+    }
+}
