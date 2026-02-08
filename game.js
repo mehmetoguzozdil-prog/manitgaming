@@ -579,26 +579,29 @@ async function saveName(name) {
 }
 
 // Custom Dropdown Logic
-const btnToggleNames = document.getElementById('btn-toggle-names');
-const customNameList = document.getElementById('custom-name-list');
+// Custom Dropdown Logic
+function initDropdown() {
+    const btnToggle = document.getElementById('btn-toggle-names');
+    const list = document.getElementById('custom-name-list');
 
-if (btnToggleNames && customNameList) {
-    btnToggleNames.addEventListener('click', (e) => {
-        e.stopPropagation();
-        customNameList.style.display = customNameList.style.display === 'block' ? 'none' : 'block';
-    });
+    if (btnToggle && list) {
+        console.log("Dropdown initialized");
+        btnToggle.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log("Toggle clicked");
+            list.style.display = list.style.display === 'block' ? 'none' : 'block';
+        });
 
-    document.addEventListener('click', (e) => {
-        if (!processClick(e)) return;
-    });
-
-    function processClick(e) {
-        if (customNameList.style.display === 'block' &&
-            !customNameList.contains(e.target) &&
-            e.target !== btnToggleNames) {
-            customNameList.style.display = 'none';
-        }
-        return true;
+        document.addEventListener('click', (e) => {
+            if (list.style.display === 'block' &&
+                !list.contains(e.target) &&
+                e.target !== btnToggle) {
+                list.style.display = 'none';
+            }
+        });
+    } else {
+        console.error("Dropdown elements missing");
     }
 }
 
@@ -1106,5 +1109,6 @@ audioEl.addEventListener('ended', () => {
 });
 
 loadSavedNames(); // Load saved player names
+initDropdown();
 
 console.log("Game loaded!");

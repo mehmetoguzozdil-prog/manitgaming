@@ -632,25 +632,27 @@ input {
 @media (max-width: 600px) {
     #music-player {
         width: 100%;
-        top: 0;
-        /* Move to top */
-        bottom: auto;
-        /* Reset bottom */
+        top: auto;
+        bottom: 0;
         left: 0;
-        border-radius: 0 0 12px 12px;
-        /* Rounded bottom corners */
+        border-radius: 0;
         padding: 8px 15px;
         flex-direction: row;
         align-items: center;
         justify-content: space-between;
         border: none;
-        border-bottom: 1px solid var(--accent-gold);
-        background: rgba(0, 0, 0, 0.9);
+        border-top: 1px solid var(--accent-gold);
+        background: rgba(0, 0, 0, 0.95);
+        z-index: 1000;
     }
 
-    /* Push content down so it's not covered by player */
+    /* Push controls up so buttons aren't covered by player */
+    #controls {
+        padding-bottom: 80px;
+    }
+
     #app {
-        padding-top: 50px;
+        padding-top: 10px;
     }
 
     .track-info {
