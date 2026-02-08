@@ -171,8 +171,16 @@ function startHand(state) {
     const deck = new Deck(); deck.shuffle();
     state.pot = 0; state.communityCards = []; state.deck = deck.cards; state.phase = PHASES.PRE_FLOP; state.winner = null; state.lastAction = 'New Hand';
     state.lastActive = Date.now();
+    state.lastRaiser = -1;
 
-    state.players.forEach(p => { p.hand = []; p.currentBet = 0; p.folded = false; p.isAllIn = false; });
+    // Reset all player state for new hand
+    state.players.forEach(p => {
+        p.hand = [];
+        p.currentBet = 0;
+        p.folded = false;
+        p.isAllIn = false;
+        p.hasActed = false;
+    });
 
     // Deal 2 cards to each connected player
     state.players.forEach(p => {
@@ -184,14 +192,28 @@ function startHand(state) {
     const activePlayers = state.players.filter(p => p.connected && !p.folded);
     if (activePlayers.length < 2) return state;
 
-    const sbIndex = (state.dealerIndex + 1) % state.players.length;
-    const bbIndex = (state.dealerIndex + 2) % state.players.length;
+    // For 2 players: dealer is SB, other is BB
+    // For 3+ players: SB = dealer+1, BB = dealer+2
+    let sbIndex, bbIndex;
+    if (state.maxPlayers === 2) {
+        sbIndex = state.dealerIndex;
+        bbIndex = (state.dealerIndex + 1) % 2;
+    } else {
+        sbIndex = getNextActivePlayer(state, state.dealerIndex);
+        bbIndex = getNextActivePlayer(state, sbIndex);
+    }
 
     postBlind(state, sbIndex, state.minBet / 2);
     postBlind(state, bbIndex, state.minBet);
 
-    // First to act is after BB
-    state.turnIndex = getNextActivePlayer(state, bbIndex);
+    // Pre-flop: First to act is after BB (or SB in heads-up)
+    if (state.maxPlayers === 2) {
+        state.turnIndex = sbIndex; // In heads-up, SB acts first pre-flop
+    } else {
+        state.turnIndex = getNextActivePlayer(state, bbIndex);
+    }
+
+    console.log(`startHand: SB=${sbIndex}, BB=${bbIndex}, turn=${state.turnIndex}`);
     return state;
 }
 
@@ -221,14 +243,23 @@ function countActivePlayers(state) {
 }
 
 function handleAction(state, playerIndex, action, amount = 0) {
-    if (state.turnIndex !== playerIndex) return state;
+    console.log(`handleAction: player ${playerIndex}, action ${action}, amount ${amount}`);
+
+    if (state.turnIndex !== playerIndex) {
+        console.log("Not this player's turn");
+        return state;
+    }
     const player = state.players[playerIndex];
-    if (!player || player.folded) return state;
+    if (!player || player.folded) {
+        console.log("Player folded or invalid");
+        return state;
+    }
 
     state.lastActive = Date.now();
 
     const highBet = Math.max(...state.players.map(p => p.currentBet));
     const toCall = highBet - player.currentBet;
+    console.log(`highBet: ${highBet}, toCall: ${toCall}, player.currentBet: ${player.currentBet}`);
 
     if (action === 'fold') {
         player.folded = true;
@@ -238,40 +269,85 @@ function handleAction(state, playerIndex, action, amount = 0) {
             return endHand(state, winner.id);
         }
     } else if (action === 'check') {
-        if (toCall > 0) return state;
+        if (toCall > 0) {
+            console.log("Cannot check, must call or fold");
+            return state;
+        }
         state.lastAction = `${player.name} checks`;
+        player.hasActed = true;
     } else if (action === 'call') {
+        if (toCall <= 0) {
+            console.log("Nothing to call, should check instead");
+            return state;
+        }
         const callAmt = Math.min(toCall, player.chips);
-        player.chips -= callAmt; player.currentBet += callAmt;
+        player.chips -= callAmt;
+        player.currentBet += callAmt;
         player.isAllIn = (player.chips === 0);
         state.pot += callAmt;
         state.lastAction = `${player.name} calls ${callAmt}`;
+        player.hasActed = true;
+        console.log(`Called ${callAmt}, new pot: ${state.pot}`);
     } else if (action === 'raise') {
-        const raiseAmt = amount - player.currentBet;
-        if (raiseAmt > player.chips || amount <= highBet) return state;
-        player.chips -= raiseAmt; player.currentBet = amount;
+        // amount is the TOTAL bet (not the raise amount)
+        if (amount <= highBet) {
+            console.log(`Raise amount ${amount} must be greater than high bet ${highBet}`);
+            return state;
+        }
+        const totalToAdd = amount - player.currentBet;
+        if (totalToAdd > player.chips) {
+            console.log(`Not enough chips: need ${totalToAdd}, have ${player.chips}`);
+            return state;
+        }
+        player.chips -= totalToAdd;
+        player.currentBet = amount;
         player.isAllIn = (player.chips === 0);
-        state.pot += raiseAmt;
+        state.pot += totalToAdd;
         state.lastAction = `${player.name} raises to ${amount}`;
+        state.lastRaiser = playerIndex;
+        // Reset hasActed for others since there was a raise
+        state.players.forEach((p, i) => {
+            if (i !== playerIndex && p.connected && !p.folded && !p.isAllIn) {
+                p.hasActed = false;
+            }
+        });
+        player.hasActed = true;
+        console.log(`Raised to ${amount}, added ${totalToAdd}, new pot: ${state.pot}`);
     }
 
-    if (isRoundOver(state)) return nextPhase(state);
+    // Check if round is over
+    if (isRoundOver(state)) {
+        console.log("Round over, moving to next phase");
+        return nextPhase(state);
+    }
 
     const next = getNextActivePlayer(state, playerIndex);
-    if (next === -1) return nextPhase(state);
+    if (next === -1) {
+        console.log("No next player, moving to next phase");
+        return nextPhase(state);
+    }
     state.turnIndex = next;
+    console.log(`Next turn: player ${next}`);
     return state;
 }
 
 function isRoundOver(state) {
     const active = state.players.filter(p => p.connected && !p.folded && !p.isAllIn);
     if (active.length <= 1) return true;
-    const bets = active.map(p => p.currentBet);
-    return bets.every(b => b === bets[0]) && bets[0] > 0;
+
+    // All active players must have acted and bets must be equal
+    const allActed = active.every(p => p.hasActed === true);
+    const highBet = Math.max(...state.players.map(p => p.currentBet));
+    const allBetsEqual = active.every(p => p.currentBet === highBet);
+
+    console.log(`isRoundOver check: allActed=${allActed}, allBetsEqual=${allBetsEqual}, highBet=${highBet}`);
+    return allActed && allBetsEqual;
 }
 
 function nextPhase(state) {
     state.players.forEach(p => p.currentBet = 0);
+    state.players.forEach(p => p.hasActed = false); // Reset for next phase
+    state.lastRaiser = -1; // Reset raiser for next phase
 
     if (state.phase === PHASES.PRE_FLOP) { state.phase = PHASES.FLOP; dealCommunity(state, 3); }
     else if (state.phase === PHASES.FLOP) { state.phase = PHASES.TURN; dealCommunity(state, 1); }
