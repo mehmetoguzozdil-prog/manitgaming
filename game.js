@@ -525,12 +525,27 @@ async function createRoom(playerCount) {
     return roomId;
 }
 
+function sanitizeState(state) {
+    if (!state) return null;
+    if (!state.players) state.players = [];
+    if (!state.deck) state.deck = [];
+    if (!state.community) state.community = [];
+
+    state.players.forEach(p => {
+        if (!p.cards) p.cards = [];
+    });
+
+    return state;
+}
+
 async function joinRoom(roomId, playerIdx) {
     const db = getDB();
     const roomRef = ref(db, 'rooms/' + roomId);
     const snap = await get(roomRef);
-    const state = snap.val();
+    let state = snap.val();
     if (!state) return false;
+
+    state = sanitizeState(state);
 
     state.players[playerIdx].connected = true;
     state.connectedCount = state.players.filter(p => p.connected).length;
@@ -549,8 +564,11 @@ async function joinRoom(roomId, playerIdx) {
 function subscribeToRoom(roomId, callback) {
     const db = getDB();
     onValue(ref(db, 'rooms/' + roomId), (snap) => {
-        const data = snap.val();
-        if (data) callback(data);
+        let data = snap.val();
+        if (data) {
+            data = sanitizeState(data);
+            callback(data);
+        }
     });
 }
 
@@ -558,10 +576,11 @@ async function sendPlayerAction(roomId, playerIdx, action, amount) {
     const db = getDB();
     const roomRef = ref(db, 'rooms/' + roomId);
     const snap = await get(roomRef);
-    const state = snap.val();
+    let state = snap.val();
     if (!state) return;
 
-    const newState = handlePlayerAction(JSON.parse(JSON.stringify(state)), playerIdx, action, amount);
+    state = sanitizeState(state);
+    const newState = handlePlayerAction(state, playerIdx, action, amount);
     await set(roomRef, newState);
 }
 
@@ -569,10 +588,11 @@ async function requestNewHand(roomId) {
     const db = getDB();
     const roomRef = ref(db, 'rooms/' + roomId);
     const snap = await get(roomRef);
-    const state = snap.val();
+    let state = snap.val();
     if (!state) return;
 
-    const newState = startNewHand(JSON.parse(JSON.stringify(state)));
+    state = sanitizeState(state);
+    const newState = startNewHand(state);
     newState.status = 'playing';
     await set(roomRef, newState);
 }
