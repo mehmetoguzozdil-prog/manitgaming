@@ -275,6 +275,7 @@ function handleAction(state, playerIndex, action, amount = 0) {
         }
         state.lastAction = `${player.name} checks`;
         player.hasActed = true;
+        console.log(`${player.name} checked, hasActed set to true`);
     } else if (action === 'call') {
         if (toCall <= 0) {
             console.log("Nothing to call, should check instead");
@@ -333,30 +334,53 @@ function handleAction(state, playerIndex, action, amount = 0) {
 
 function isRoundOver(state) {
     const active = state.players.filter(p => p.connected && !p.folded && !p.isAllIn);
-    if (active.length <= 1) return true;
 
-    // All active players must have acted and bets must be equal
-    const allActed = active.every(p => p.hasActed === true);
+    // Only 1 or fewer active players
+    if (active.length <= 1) {
+        console.log("isRoundOver: true (1 or fewer active)");
+        return true;
+    }
+
+    // Check if all bets are equal
     const highBet = Math.max(...state.players.map(p => p.currentBet));
     const allBetsEqual = active.every(p => p.currentBet === highBet);
 
-    console.log(`isRoundOver check: allActed=${allActed}, allBetsEqual=${allBetsEqual}, highBet=${highBet}`);
-    return allActed && allBetsEqual;
+    if (!allBetsEqual) {
+        console.log(`isRoundOver: false (bets not equal, highBet=${highBet})`);
+        return false;
+    }
+
+    // Count how many have acted this round
+    const actedCount = active.filter(p => p.hasActed === true).length;
+    const allActed = actedCount === active.length;
+
+    console.log(`isRoundOver: allBetsEqual=${allBetsEqual}, actedCount=${actedCount}/${active.length}, allActed=${allActed}`);
+    return allActed;
 }
 
 function nextPhase(state) {
-    state.players.forEach(p => p.currentBet = 0);
-    state.players.forEach(p => p.hasActed = false); // Reset for next phase
-    state.lastRaiser = -1; // Reset raiser for next phase
+    console.log(`nextPhase from ${state.phase}`);
+
+    // Reset for new betting round
+    state.players.forEach(p => {
+        p.currentBet = 0;
+        p.hasActed = false;
+    });
+    state.lastRaiser = -1;
 
     if (state.phase === PHASES.PRE_FLOP) { state.phase = PHASES.FLOP; dealCommunity(state, 3); }
     else if (state.phase === PHASES.FLOP) { state.phase = PHASES.TURN; dealCommunity(state, 1); }
     else if (state.phase === PHASES.TURN) { state.phase = PHASES.RIVER; dealCommunity(state, 1); }
     else if (state.phase === PHASES.RIVER) { state.phase = PHASES.SHOWDOWN; return determineWinner(state); }
 
+    // First to act post-flop is first active after dealer
     const first = getNextActivePlayer(state, state.dealerIndex);
-    if (first === -1) return determineWinner(state);
+    if (first === -1) {
+        console.log("No active players, determining winner");
+        return determineWinner(state);
+    }
     state.turnIndex = first;
+    console.log(`Next phase: ${state.phase}, first to act: ${first}`);
     return state;
 }
 
