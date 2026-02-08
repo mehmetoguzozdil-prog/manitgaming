@@ -102,6 +102,14 @@ function evaluateHand(cards) {
     return { type: handType, values };
 }
 
+function getHandName(handType) {
+    const names = [
+        "High Card", "Pair", "Two Pair", "Three of a Kind",
+        "Straight", "Flush", "Full House", "Four of a Kind", "Straight Flush"
+    ];
+    return names[handType] || "High Card";
+}
+
 function getBestHand(allCards) {
     // Get best 5-card hand from 7 cards
     if (allCards.length <= 5) return evaluateHand(allCards);
@@ -308,12 +316,21 @@ function handlePlayerAction(state, playerIdx, action, amount = 0) {
         state.actedThisRound++; // Player has acted
     }
     else if (action === 'raise') {
-        // amount = total bet size
         if (amount <= state.currentBet) {
             console.log("Raise must be more than current bet");
             return state;
         }
-        const totalNeeded = amount - player.bet;
+
+        // Allow smaller raises per user request
+        const totalNeeded = amount - player.bet; // Amount adding to pot
+        const raiseSize = amount - state.currentBet; // The actual raise amount over previous high bet
+
+        // Enforce a minimum raise of 1 chip (or whatever user wants)
+        if (raiseSize < 1) {
+            console.log("Raise must be at least 1");
+            return state;
+        }
+
         if (totalNeeded > player.chips) {
             console.log("Not enough chips");
             return state;
@@ -322,7 +339,7 @@ function handlePlayerAction(state, playerIdx, action, amount = 0) {
         player.bet = amount;
         state.pot += totalNeeded;
         state.currentBet = amount;
-        state.minRaise = amount - state.currentBet + BIG_BLIND;
+        state.minRaise = 1; // Keeping min raise small as requested
         state.lastRaise = playerIdx;
         player.allIn = player.chips === 0;
         state.message = `${player.name} raises to ${amount}`;
@@ -495,8 +512,19 @@ function showdown(state) {
     winners.forEach(w => w.chips += share);
 
     state.winner = winners.length === 1 ? winners[0].id : 'split';
-    state.message = winners.length === 1 ? `${winners[0].name} wins!` : 'Split pot!';
+
+    // Create detailed message with hand name
+    let winMsg = "";
+    if (winners.length === 1) {
+        winMsg = `${winners[0].name} wins with ${getHandName(bestHand.type)}!`;
+    } else {
+        winMsg = `Split pot! (${getHandName(bestHand.type)})`;
+    }
+
+    state.message = winMsg;
     state.phase = 'finished';
+
+    return state;
 
     return state;
 }
@@ -872,7 +900,7 @@ function doAction(action) {
             return;
         }
 
-        const minBet = gameState.currentBet + BIG_BLIND;
+        const minBet = gameState.currentBet + 1; // Allow raise by 1
         const maxBet = me.chips + me.bet;
 
         slider.min = Math.min(minBet, maxBet);
