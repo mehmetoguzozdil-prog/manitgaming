@@ -555,15 +555,44 @@ function genRoomId() {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-async function createRoom(playerCount) {
+async function createRoom(playerCount, playerName) {
     const db = getDB();
     const roomId = genRoomId();
     const state = createNewGame(playerCount);
     state.players[0].connected = true;
+    if (playerName) state.players[0].name = playerName;
     state.connectedCount = 1;
     await set(ref(db, 'rooms/' + roomId), state);
     console.log("Room created:", roomId);
     return roomId;
+}
+
+// Name Persistence
+async function saveName(name) {
+    if (!name) return;
+    const db = getDB();
+    // Sanitize key for Firebase (remove . # $ [ ] /)
+    const key = name.replace(/[.#$/\[\]]/g, "");
+    if (key) {
+        await set(ref(db, 'playerNames/' + key), name);
+    }
+}
+
+function loadSavedNames() {
+    const db = getDB();
+    onValue(ref(db, 'playerNames'), (snap) => {
+        const names = snap.val();
+        if (!names) return;
+        const datalist = document.getElementById('saved-names');
+        if (datalist) {
+            datalist.innerHTML = '';
+            Object.values(names).forEach(n => {
+                const opt = document.createElement('option');
+                opt.value = n;
+                datalist.appendChild(opt);
+            });
+        }
+    });
 }
 
 function sanitizeState(state) {
@@ -579,7 +608,7 @@ function sanitizeState(state) {
     return state;
 }
 
-async function joinRoom(roomId, playerIdx) {
+async function joinRoom(roomId, playerIdx, playerName) {
     const db = getDB();
     const roomRef = ref(db, 'rooms/' + roomId);
     const snap = await get(roomRef);
@@ -589,6 +618,7 @@ async function joinRoom(roomId, playerIdx) {
     state = sanitizeState(state);
 
     state.players[playerIdx].connected = true;
+    if (playerName) state.players[playerIdx].name = playerName;
     state.connectedCount = state.players.filter(p => p.connected).length;
     state.lastActive = Date.now();
 
@@ -681,12 +711,18 @@ const boardEl = document.getElementById('board');
 const potEl = document.getElementById('pot-amount');
 
 // Lobby
+const inpPlayerName = document.getElementById('player-name');
+const chkSaveName = document.getElementById('save-name-default');
+
 btnCreate.addEventListener('click', async () => {
     btnCreate.disabled = true;
     lobbyMsg.textContent = "Creating...";
     try {
+        const name = inpPlayerName.value.trim();
+        if (chkSaveName.checked) saveName(name);
+
         const count = parseInt(playerCountSelect.value);
-        const roomId = await createRoom(count);
+        const roomId = await createRoom(count, name || "Player 1");
         enterGame(roomId, 0);
     } catch (e) {
         console.error(e);
@@ -720,7 +756,10 @@ btnJoin.addEventListener('click', async () => {
         return;
     }
 
-    const ok = await joinRoom(code, slot);
+    const name = inpPlayerName.value.trim();
+    if (chkSaveName.checked) saveName(name);
+
+    const ok = await joinRoom(code, slot, name || `Player ${slot + 1}`);
     if (ok) enterGame(code, slot);
     else lobbyMsg.textContent = "Failed to join";
 });
@@ -1007,5 +1046,7 @@ volSlider.addEventListener('input', (e) => {
 audioEl.addEventListener('ended', () => {
     loadTrack(currentTrackIdx + 1);
 });
+
+loadSavedNames(); // Load saved player names
 
 console.log("Game loaded!");

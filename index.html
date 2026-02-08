@@ -40,6 +40,16 @@
                         <option value="6">6 Players</option>
                     </select>
                 </div>
+
+                <div class="player-identity">
+                    <input type="text" id="player-name" list="saved-names" placeholder="Your Name (Optional)"
+                        maxlength="12">
+                    <datalist id="saved-names"></datalist>
+                    <label class="save-check">
+                        <input type="checkbox" id="save-name-default"> Save name
+                    </label>
+                </div>
+
                 <button id="btn-create">Create Room</button>
                 <div class="join-form">
                     <input type="text" id="inp-room-code" placeholder="Enter Room Code" maxlength="6">
