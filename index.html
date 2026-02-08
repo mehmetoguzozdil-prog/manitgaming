@@ -4,15 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Heads Up Poker</title>
+    <title>Multiplayer Poker</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-
     <div id="app">
         <div id="debug-log"
-            style="position:fixed; top:0; left:0; width:100%; height:50px; background:rgba(255,0,0,0.8); color:white; z-index:9999; overflow:auto; display:none; font-size:12px;">
+            style="position:fixed; top:0; left:0; width:100%; max-height:80px; background:rgba(255,0,0,0.9); color:white; z-index:9999; overflow:auto; display:none; font-size:11px; padding:5px;">
         </div>
         <script>
             window.addEventListener('error', (e) => {
@@ -26,10 +25,21 @@
                 d.innerText += "Promise Error: " + e.reason + "\n";
             });
         </script>
+
         <!-- Lobby Screen -->
         <div id="lobby" class="screen active">
-            <h1>PvP Poker</h1>
+            <h1>Poker Room</h1>
             <div class="lobby-controls">
+                <div class="player-select">
+                    <label for="player-count">Players:</label>
+                    <select id="player-count">
+                        <option value="2">2 Players</option>
+                        <option value="3">3 Players</option>
+                        <option value="4">4 Players</option>
+                        <option value="5">5 Players</option>
+                        <option value="6">6 Players</option>
+                    </select>
+                </div>
                 <button id="btn-create">Create Room</button>
                 <div class="join-form">
                     <input type="text" id="inp-room-code" placeholder="Enter Room Code" maxlength="6">
@@ -42,30 +52,18 @@
         <!-- Game Screen -->
         <div id="game" class="screen">
             <div class="header">
-                <div class="room-info">Room: <span id="display-room-code"></span></div>
+                <div class="room-info">Room: <span id="display-room-code"></span> | <span
+                        id="player-count-display"></span></div>
                 <div class="pot-info">Pot: <span id="pot-amount">0</span></div>
             </div>
 
-            <!-- Opponent Area (Top) -->
-            <div id="opponent-area" class="player-area">
-                <div class="player-info">
-                    <div class="avatar">P2</div>
-                    <div class="details">
-                        <span class="name">Opponent</span>
-                        <span class="chips">Loading...</span>
-                    </div>
-                </div>
-                <div class="cards" id="opponent-cards">
-                    <div class="card back"></div>
-                    <div class="card back"></div>
-                </div>
-                <div class="status-bubble" id="opponent-status"></div>
-                <div class="bet-chip" id="opponent-bet"></div>
+            <!-- Opponents Container (scrollable for 3+ players) -->
+            <div id="opponents-container">
+                <!-- Dynamic opponent areas will be injected here -->
             </div>
 
             <!-- Board / Community Cards -->
             <div id="board">
-                <!-- Cards will be injected here -->
                 <div class="card-slot"></div>
                 <div class="card-slot"></div>
                 <div class="card-slot"></div>
@@ -73,18 +71,16 @@
                 <div class="card-slot"></div>
             </div>
 
-            <!-- Player Area (Bottom) -->
-            <div id="player-area" class="player-area">
+            <!-- Player Area (Me - Bottom) -->
+            <div id="player-area" class="player-area me">
                 <div class="bet-chip" id="player-bet"></div>
                 <div class="status-bubble" id="player-status"></div>
-                <div class="cards" id="player-cards">
-                    <!-- Cards injected here -->
-                </div>
+                <div class="cards" id="player-cards"></div>
                 <div class="player-info">
                     <div class="avatar">ME</div>
                     <div class="details">
                         <span class="name">You</span>
-                        <span class="chips">Loading...</span>
+                        <span class="chips">$1000</span>
                     </div>
                 </div>
             </div>
@@ -113,7 +109,6 @@
         </div>
     </div>
 
-    <!-- Initialization -->
     <script type="module" src="game.js"></script>
 </body>
 
