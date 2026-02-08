@@ -386,70 +386,83 @@ function isBettingRoundOver(state) {
 }
 
 function advancePhase(state) {
-    console.log(`Advancing from ${state.phase}`);
+    try {
+        console.log(`Advancing from ${state.phase}`);
 
-    // Safety checks for Firebase arrays
-    if (!state.community) state.community = [];
-    if (!state.deck) state.deck = [];
+        // Safety checks for Firebase arrays - PARANOID MODE
+        if (!state) throw new Error("State is null in advancePhase");
+        if (!state.community) { console.warn("Fixed missing community"); state.community = []; }
+        if (!state.deck) { console.warn("Fixed missing deck"); state.deck = []; }
 
-    // Reset bets for new round
-    state.players.forEach(p => p.bet = 0);
-    state.currentBet = 0;
-    state.actedThisRound = 0; // Reset action counter
-
-    if (state.phase === 'preflop') {
-        state.phase = 'flop';
-        if (state.deck.length >= 3) {
-            state.deck.pop(); // Burn
-            state.community.push(state.deck.pop(), state.deck.pop(), state.deck.pop());
+        // Reset bets for new round
+        if (state.players) {
+            state.players.forEach(p => p.bet = 0);
         }
-        state.message = 'Flop';
-    }
-    else if (state.phase === 'flop') {
-        state.phase = 'turn';
-        if (state.deck.length >= 1) {
-            state.deck.pop(); // Burn
-            state.community.push(state.deck.pop());
-        }
-        state.message = 'Turn';
-    }
-    else if (state.phase === 'turn') {
-        state.phase = 'river';
-        if (state.deck.length >= 1) {
-            state.deck.pop(); // Burn
-            state.community.push(state.deck.pop());
-        }
-        state.message = 'River';
-    }
-    else if (state.phase === 'river') {
-        return showdown(state);
-    }
+        state.currentBet = 0;
+        state.actedThisRound = 0;
 
-    // Check if we can continue betting or go straight to showdown
-    const canAct = activeNonAllIn(state);
-    if (canAct.length <= 1) {
-        // Everyone is all-in or only 1 player left, deal remaining cards
-        while (state.community.length < 5 && state.phase !== 'showdown') {
-            if (state.community.length < 3) {
-                state.deck.pop();
-                state.community.push(state.deck.pop(), state.deck.pop(), state.deck.pop());
-            } else if (state.community.length < 4) {
-                state.deck.pop();
-                state.community.push(state.deck.pop());
-            } else if (state.community.length < 5) {
-                state.deck.pop();
-                state.community.push(state.deck.pop());
+        if (state.phase === 'preflop') {
+            state.phase = 'flop';
+            if (state.deck.length >= 3) {
+                state.deck.pop(); // Burn
+                const c1 = state.deck.pop();
+                const c2 = state.deck.pop();
+                const c3 = state.deck.pop();
+                if (!state.community) state.community = []; // Extra check
+                state.community.push(c1, c2, c3);
             }
+            state.message = 'Flop';
         }
-        return showdown(state);
+        else if (state.phase === 'flop') {
+            state.phase = 'turn';
+            if (state.deck.length >= 1) {
+                state.deck.pop(); // Burn
+                const c = state.deck.pop();
+                if (!state.community) state.community = []; // Extra check
+                state.community.push(c);
+            }
+            state.message = 'Turn';
+        }
+        else if (state.phase === 'turn') {
+            state.phase = 'river';
+            if (state.deck.length >= 1) {
+                state.deck.pop(); // Burn
+                const c = state.deck.pop();
+                if (!state.community) state.community = []; // Extra check
+                state.community.push(c);
+            }
+            state.message = 'River';
+        }
+        else if (state.phase === 'river') {
+            return showdown(state);
+        }
+
+        // Check if we can continue betting or go straight to showdown
+        const canAct = activeNonAllIn(state);
+        if (canAct.length <= 1) {
+            // Everyone is all-in or only 1 player left, deal remaining cards
+            while (state.community.length < 5 && state.phase !== 'showdown') {
+                if (state.community.length < 3) {
+                    if (state.deck.length > 0) state.deck.pop();
+                    if (state.deck.length >= 3) state.community.push(state.deck.pop(), state.deck.pop(), state.deck.pop());
+                } else if (state.community.length < 5) {
+                    if (state.deck.length > 0) state.deck.pop();
+                    if (state.deck.length >= 1) state.community.push(state.deck.pop());
+                }
+            }
+            return showdown(state);
+        }
+
+        // First to act post-flop is first active after dealer
+        state.currentPlayer = nextActivePlayer(state, state.dealer);
+        state.lastRaise = state.currentPlayer;
+
+        console.log(`Now in ${state.phase}, current player: ${state.currentPlayer}`);
+        return state;
+    } catch (e) {
+        console.error("CRITICAL ERROR IN ADVANCE PHASE:", e);
+        return state; // Return state to avoid crash
     }
-
-    // First to act post-flop is first active after dealer
-    state.currentPlayer = nextActivePlayer(state, state.dealer);
-    state.lastRaise = state.currentPlayer; // Reset for new round
-
-    console.log(`Now in ${state.phase}, current player: ${state.currentPlayer}`);
-    return state;
 }
 
 function showdown(state) {
