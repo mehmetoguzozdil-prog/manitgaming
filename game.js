@@ -928,4 +928,84 @@ btnConfirmRaise.addEventListener('click', () => {
     sliderContainer.style.display = 'none';
 });
 
+// ============================================
+// MUSIC PLAYER LOGIC
+// ============================================
+const audioEl = document.getElementById('bg-audio');
+const btnPlay = document.getElementById('btn-play');
+const btnPrev = document.getElementById('btn-prev');
+const btnNext = document.getElementById('btn-next');
+const volSlider = document.getElementById('volume-slider');
+const trackNameEl = document.getElementById('track-name');
+
+// Playlist - User can upload files with these names
+const playlist = [
+    'music.mp3',
+    'track1.mp3',
+    'track2.mp3',
+    'jazz_poker.mp3',
+    'casino_ambience.mp3'
+];
+
+let currentTrackIdx = 0;
+let isPlaying = false;
+
+function loadTrack(index) {
+    if (index < 0) index = playlist.length - 1;
+    if (index >= playlist.length) index = 0;
+
+    currentTrackIdx = index;
+    const track = playlist[currentTrackIdx];
+
+    audioEl.src = track;
+    trackNameEl.textContent = track;
+
+    // Attempt to play if was already playing
+    if (isPlaying) {
+        audioEl.play().catch(e => {
+            console.log("Audio play failed (maybe file missing):", e);
+            trackNameEl.textContent = `File not found: ${track}`;
+        });
+    }
+}
+
+// Initialize
+// volume
+audioEl.volume = 0.5;
+loadTrack(0);
+
+btnPlay.addEventListener('click', () => {
+    if (isPlaying) {
+        audioEl.pause();
+        btnPlay.textContent = '▶';
+        isPlaying = false;
+    } else {
+        audioEl.play().then(() => {
+            btnPlay.textContent = '⏸';
+            isPlaying = true;
+            trackNameEl.textContent = playlist[currentTrackIdx];
+        }).catch(e => {
+            console.error(e);
+            trackNameEl.textContent = `Missing: ${playlist[currentTrackIdx]}`;
+        });
+    }
+});
+
+btnNext.addEventListener('click', () => {
+    loadTrack(currentTrackIdx + 1);
+});
+
+btnPrev.addEventListener('click', () => {
+    loadTrack(currentTrackIdx - 1);
+});
+
+volSlider.addEventListener('input', (e) => {
+    audioEl.volume = e.target.value;
+});
+
+// Auto-play next track
+audioEl.addEventListener('ended', () => {
+    loadTrack(currentTrackIdx + 1);
+});
+
 console.log("Game loaded!");

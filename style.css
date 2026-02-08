@@ -512,3 +512,114 @@ input {
     color: white;
     flex: 1;
 }
+
+/* ============ MUSIC PLAYER ============ */
+#music-player {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--accent-gold);
+    border-radius: 12px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 250px;
+    z-index: 1000;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    transition: opacity 0.3s;
+}
+
+#music-player:hover {
+    opacity: 1;
+}
+
+.track-info {
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--accent-gold);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.controls {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+}
+
+.controls button {
+    background: transparent;
+    color: white;
+    font-size: 1.2rem;
+    padding: 5px;
+    cursor: pointer;
+    border: none;
+    transition: transform 0.1s;
+}
+
+.controls button:hover {
+    transform: scale(1.1);
+    color: var(--accent-gold);
+}
+
+.volume-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: #ccc;
+}
+
+.volume-control input[type="range"] {
+    flex: 1;
+    height: 4px;
+    padding: 0;
+    margin: 0;
+    background: #555;
+    border: none;
+    width: 100%;
+}
+
+/* ============ BACKGROUND IMAGE ============ */
+#lobby {
+    background: url('lobby-bg.jpg') no-repeat center center fixed;
+    background-size: cover;
+    /* Fallback if image not loaded */
+    background-color: #0b0c10;
+}
+
+@media (max-width: 600px) {
+    #music-player {
+        width: 100%;
+        bottom: 0;
+        left: 0;
+        border-radius: 12px 12px 0 0;
+        padding: 10px;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: none;
+        border-left: none;
+        border-right: none;
+    }
+
+    .track-info {
+        font-size: 0.8rem;
+        text-align: left;
+        flex: 1;
+        margin-right: 10px;
+    }
+
+    .controls {
+        gap: 10px;
+    }
+
+    .volume-control {
+        display: none;
+        /* Hide volume on mobile to save space */
+    }
+}
