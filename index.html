@@ -119,11 +119,21 @@
                     <button class="btn-action call" data-action="call">Call</button>
                     <button class="btn-action raise" data-action="raise">Raise</button>
                 </div>
+                <!-- Betting Shortcuts -->
+                <div id="betting-shortcuts" style="display:none; justify-content:center; gap:5px; margin-top:5px;">
+                    <button class="btn-shortcut" data-mult="0.5">1/2 Pot</button>
+                    <button class="btn-shortcut" data-mult="1.0">Pot</button>
+                    <button class="btn-shortcut" data-action="allin">All-in</button>
+                </div>
                 <div class="slider-container" id="raise-slider-container" style="display:none;">
                     <span id="slider-label" style="font-size: 0.8rem; color: #ccc;">Raise by:</span>
                     <input type="range" id="raise-slider" min="0" max="1000" step="1">
                     <input type="number" id="raise-val" value="0" min="0">
                     <button id="btn-confirm-raise">Bet</button>
+                </div>
+                <!-- Hand Strength Indicator -->
+                <div id="hand-strength"
+                    style="text-align:center; color: var(--accent-gold); font-size: 0.9rem; margin-top: 5px; font-weight: bold; min-height: 1.2rem;">
                 </div>
             </div>
 
