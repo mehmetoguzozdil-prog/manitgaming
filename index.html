@@ -185,6 +185,18 @@
         </div>
     </div>
 
+    <div id="tournament-over-overlay" class="modal-overlay" style="display:none;">
+        <div class="modal-content" style="text-align: center;">
+            <div style="font-size: 3rem; margin-bottom: 15px;">🏆</div>
+            <h2 id="tournament-champ-name" style="color: var(--accent-gold); margin-bottom: 20px;"></h2>
+            <p id="tournament-msg" style="margin-bottom: 30px; font-size: 1.1rem;"></p>
+            <div class="tournament-actions" style="display: flex; flex-direction: column; gap: 10px;">
+                <button id="btn-reset-game">Start from Scratch</button>
+                <button id="btn-back-lobby" class="secondary-btn">Go to Main Menu</button>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-stats" class="modal-overlay" style="display:none;">
         <div class="modal-content">
             <h3>Player Stats: <span id="stats-name"></span></h3>

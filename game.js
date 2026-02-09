@@ -375,7 +375,7 @@ function endHand(state, winnerId) {
 }
 
 function activeNonAllIn(state) {
-    return state.players.filter(p => p.connected && !p.folded && !p.allIn);
+    return state.players.filter(p => p.connected && !p.folded && !p.allIn && !p.bankrupt);
 }
 
 // ============================================
@@ -565,21 +565,24 @@ function advancePhase(state) {
         const canAct = activeNonAllIn(state);
         if (canAct.length <= 1) {
             // Everyone is all-in or only 1 player left, deal remaining cards
-            while (state.community.length < 5 && state.phase !== 'showdown') {
+            while (state.community.length < 5) {
+                state.deck.pop(); // Burn
                 if (state.community.length < 3) {
-                    if (state.deck.length > 0) state.deck.pop();
-                    if (state.deck.length >= 3) state.community.push(state.deck.pop(), state.deck.pop(), state.deck.pop());
-                } else if (state.community.length < 5) {
-                    if (state.deck.length > 0) state.deck.pop();
-                    if (state.deck.length >= 1) state.community.push(state.deck.pop());
+                    state.community.push(state.deck.pop(), state.deck.pop(), state.deck.pop());
+                } else {
+                    state.community.push(state.deck.pop());
                 }
             }
+            state.phase = 'river'; // Set to river so showdown is final
             return showdown(state);
         }
+
 
         // First to act post-flop is first active after dealer
         state.currentPlayer = nextActivePlayer(state, state.dealer);
         state.lastRaise = state.currentPlayer;
+
+        if (state.currentPlayer === -1) return showdown(state);
 
         console.log(`Now in ${state.phase}, current player: ${state.currentPlayer}`);
         return state;
@@ -907,8 +910,18 @@ function render(state) {
 
     // Handle game over overlay
     const overlay = document.getElementById('game-overlay');
-    if (state.phase === 'finished' || state.phase === 'showdown') {
+    const tournamentOverlay = document.getElementById('tournament-over-overlay');
+
+    if (state.isGameOver) {
+        overlay.style.display = 'none';
+        tournamentOverlay.style.display = 'flex';
+        const alive = state.players.filter(p => !p.bankrupt && p.connected);
+        const winnerName = alive.length > 0 ? alive[0].name : "No one";
+        document.getElementById('tournament-champ-name').textContent = winnerName;
+        document.getElementById('tournament-msg').textContent = state.message;
+    } else if (state.phase === 'finished' || state.phase === 'showdown') {
         overlay.style.display = 'flex';
+        tournamentOverlay.style.display = 'none';
         document.getElementById('overlay-msg').textContent = state.message;
         document.getElementById('btn-next-hand').onclick = () => {
             requestNewHand(myRoomId);
@@ -916,8 +929,39 @@ function render(state) {
         };
     } else {
         overlay.style.display = 'none';
+        tournamentOverlay.style.display = 'none';
     }
 }
+
+// Tournament Actions
+document.getElementById('btn-reset-game').addEventListener('click', async () => {
+    const db = getDB();
+    const roomRef = ref(db, 'rooms/' + myRoomId);
+    const snap = await get(roomRef);
+    let state = snap.val();
+    if (!state) return;
+
+    state = sanitizeState(state);
+    // Reset all players to STARTING_CHIPS and remove bankrupt status
+    state.players.forEach(p => {
+        p.chips = STARTING_CHIPS;
+        p.bankrupt = false;
+        p.folded = false;
+        p.allIn = false;
+    });
+    state.isGameOver = false;
+    state.status = 'playing';
+    const newState = startNewHand(state);
+    await set(roomRef, newState);
+    document.getElementById('tournament-over-overlay').style.display = 'none';
+});
+
+document.getElementById('btn-back-lobby').addEventListener('click', async () => {
+    const db = getDB();
+    await remove(ref(db, 'rooms/' + myRoomId));
+    location.reload(); // Simplest way to go back to main menu
+});
+
 
 function renderOpponents(state) {
     opponentsContainer.innerHTML = '';
@@ -925,10 +969,10 @@ function renderOpponents(state) {
         if (i === myPlayerIdx) return;
 
         const div = document.createElement('div');
-        div.className = 'player-area opponent';
+        div.className = `player-area opponent ${p.bankrupt ? 'bankrupt' : ''}`;
 
         let cardsHtml = '';
-        if (p.cards && p.cards.length > 0) {
+        if (p.cards && p.cards.length > 0 && !p.bankrupt) {
             const showCards = state.phase === 'showdown' || state.phase === 'finished';
             p.cards.forEach(c => {
                 if (showCards && !p.folded) {
@@ -959,22 +1003,29 @@ function renderOpponents(state) {
 
 function renderMyCards(state) {
     const me = state.players[myPlayerIdx];
+    const playerArea = document.getElementById('player-area');
     const cardsEl = document.getElementById('player-cards');
     const chipsEl = document.querySelector('#player-area .chips');
     const statusEl = document.getElementById('player-status');
     const betEl = document.getElementById('player-bet');
 
+    if (me.bankrupt) {
+        playerArea.classList.add('bankrupt');
+    } else {
+        playerArea.classList.remove('bankrupt');
+    }
+
     cardsEl.innerHTML = '';
-    if (me.cards && me.cards.length > 0) {
+    if (me.cards && me.cards.length > 0 && !me.bankrupt) {
         me.cards.forEach(c => {
             const sym = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠' }[c.suit];
             cardsEl.innerHTML += `<div class="card ${c.suit}">${c.rank}${sym}</div>`;
         });
     }
 
-    chipsEl.textContent = `$${me.chips}${me.allIn ? ' (ALL-IN)' : ''}`;
+    chipsEl.textContent = me.bankrupt ? "$0 (ELIMINATED)" : `$${me.chips}${me.allIn ? ' (ALL-IN)' : ''}`;
 
-    const isTurn = state.currentPlayer === myPlayerIdx && state.phase !== 'showdown' && state.phase !== 'finished';
+    const isTurn = state.currentPlayer === myPlayerIdx && state.phase !== 'showdown' && state.phase !== 'finished' && !me.bankrupt;
     if (isTurn) {
         statusEl.classList.add('show');
         statusEl.textContent = 'YOUR TURN';

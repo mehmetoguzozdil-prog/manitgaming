@@ -728,11 +728,13 @@ input {
 .hands-list li span {
     color: #aeaeae;
     font-family: 'Courier New', Courier, monospace;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     background: #000;
-    padding: 4px 8px;
+    padding: 6px 10px;
     border-radius: 4px;
     border: 1px solid #444;
+    white-space: nowrap;
+    letter-spacing: 2px;
 }
 
 .card-red {
@@ -827,4 +829,40 @@ input {
     .pot-info {
         font-size: 0.75rem;
     }
+}
+
+/* ============ TOURNAMENT OVER & BANKRUPTCY ============ */
+#tournament-over-overlay {
+    background: rgba(0, 0, 0, 0.95);
+}
+
+.tournament-actions button {
+    width: 100%;
+}
+
+.bankrupt {
+    opacity: 0.5;
+    filter: grayscale(1);
+    position: relative;
+}
+
+.bankrupt::after {
+    content: "ELIMINATED";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-15deg);
+    background: rgba(255, 0, 0, 0.8);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    z-index: 5;
+    pointer-events: none;
+}
+
+.me.bankrupt::after {
+    font-size: 1.2rem;
+    padding: 5px 15px;
 }
