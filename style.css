@@ -29,10 +29,20 @@ body {
     display: flex;
 }
 
-/* Lobby */
+html,
+body {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
 #lobby {
     background: url('./lobby-bg.jpg') no-repeat center center;
     background-size: cover;
+    height: 100vh;
+    width: 100vw;
 }
 
 .lobby-controls {

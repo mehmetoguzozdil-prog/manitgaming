@@ -403,8 +403,8 @@ function render(state) {
         document.getElementById('host-waiting-msg').style.display = (myPlayerIdx !== 0 && myPlayerIdx !== -1) ? 'block' : 'none';
 
         const list = document.getElementById('opponents-container');
-        list.innerHTML = (state.players || []).filter(p => p.connected).map(p => `
-            <div class="player-bubble">${p.avatar || '👤'} ${p.name}</div>
+        list.innerHTML = (state.players || []).filter(p => p && p.connected).map(p => `
+            <div class="player-bubble">${p.avatar || '👤'} ${p.name || 'Anonymous'}</div>
         `).join('');
     } else {
         lobby.classList.remove('active'); game.classList.add('active');
@@ -507,7 +507,8 @@ document.getElementById('btn-join').onclick = async () => {
     const snap = await get(roomRef);
     if (!snap.exists()) return alert("Room Not Found");
     const state = snap.val();
-    const idx = (state.players || []).findIndex(p => p && !p.connected);
+    if (!state || !state.players) return alert("Room data corrupted.");
+    const idx = state.players.findIndex(p => p && !p.connected);
     if (idx === -1) return alert("Room is Full");
 
     state.players[idx].connected = true; state.players[idx].name = name;
