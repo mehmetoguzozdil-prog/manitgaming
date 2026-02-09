@@ -289,7 +289,11 @@ function showdown(state) {
 
     // Distribute pot
     const share = Math.floor(state.pot / winners.length);
-    winners.forEach(w => w.chips += share);
+    state.pot = 0; // RESET POT IMMEDIATELY
+    winners.forEach(w => {
+        w.chips += share;
+        console.log(`Winner ${w.name} gets ${share} chips. New total: ${w.chips}`);
+    });
 
     state.winner = winners.length === 1 ? winners[0].id : 'split';
 
@@ -489,24 +493,18 @@ function handlePlayerAction(state, playerIdx, action, amount = 0) {
 function isBettingRoundOver(state) {
     const active = activeNonAllIn(state);
 
-    // Only 0 or 1 players can act
-    if (active.length <= 1) {
-        console.log("Round over: 1 or fewer active players");
-        return true;
-    }
+    // If everyone is all-in or folded, round is over
+    if (active.length === 0) return true;
 
-    // All bets must be equal
-    const allEqual = active.every(p => p.bet === state.currentBet);
-    if (!allEqual) {
-        console.log(`Round NOT over: bets not equal (currentBet=${state.currentBet})`);
-        return false;
-    }
+    // All active players must have matched the current bet
+    const allMatched = active.every(p => p.bet === state.currentBet);
 
-    // All active players must have acted this round
-    const allActed = state.actedThisRound >= active.length;
-    console.log(`Round check: actedThisRound=${state.actedThisRound}, activeCount=${active.length}, allActed=${allActed}`);
+    // Everyone must have acted at least once (to prevent round end before blinds act)
+    const everyoneActed = state.actedThisRound >= active.length;
 
-    return allActed;
+    console.log(`Round check: allMatched=${allMatched}, everyoneActed=${everyoneActed}, currentBet=${state.currentBet}`);
+
+    return allMatched && everyoneActed;
 }
 
 function advancePhase(state) {
@@ -725,12 +723,6 @@ async function joinRoom(roomId, playerIdx, playerName) {
     state.connectedCount = state.players.filter(p => p.connected).length;
     state.lastActive = Date.now();
 
-    // Start game when 2+ players connected
-    if (state.connectedCount >= 2 && state.status === 'waiting') {
-        dealCards(state);
-        state.status = 'playing';
-    }
-
     await set(roomRef, state);
     return true;
 }
@@ -895,10 +887,25 @@ function render(state) {
     playerCountDisplay.textContent = `${state.connectedCount}/${state.maxPlayers}`;
 
     if (state.status === 'waiting') {
+        const startControls = document.getElementById('game-start-controls');
+        const hostWaitingMsg = document.getElementById('host-waiting-msg');
+        const btnStart = document.getElementById('btn-start-game');
+
+        startControls.style.display = 'block';
+        if (myPlayerIdx === 0) {
+            btnStart.style.display = 'inline-block';
+            hostWaitingMsg.style.display = 'none';
+        } else {
+            btnStart.style.display = 'none';
+            hostWaitingMsg.style.display = 'block';
+        }
+
         potEl.textContent = "Waiting for players...";
         renderOpponents(state);
         renderMyCards(state);
         return;
+    } else {
+        document.getElementById('game-start-controls').style.display = 'none';
     }
 
     potEl.textContent = `${state.pot} | ${state.message || state.phase}`;
@@ -960,6 +967,24 @@ document.getElementById('btn-back-lobby').addEventListener('click', async () => 
     const db = getDB();
     await remove(ref(db, 'rooms/' + myRoomId));
     location.reload(); // Simplest way to go back to main menu
+});
+
+document.getElementById('btn-start-game').addEventListener('click', async () => {
+    const db = getDB();
+    const roomRef = ref(db, 'rooms/' + myRoomId);
+    const snap = await get(roomRef);
+    let state = snap.val();
+    if (!state) return;
+
+    state = sanitizeState(state);
+    if (state.connectedCount < 2) {
+        alert("Need at least 2 players to start!");
+        return;
+    }
+
+    const newState = dealCards(state);
+    newState.status = 'playing';
+    await set(roomRef, newState);
 });
 
 
