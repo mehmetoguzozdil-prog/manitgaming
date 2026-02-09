@@ -4,14 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Multiplayer Poker - Final Edition</title>
-    <!-- Cache Busting Versioning -->
-    <link rel="stylesheet" href="style.css?v=FIN_REV">
+    <title>Multiplayer Poker</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
     <div id="app">
-        <!-- Error Reporting (Hidden by default) -->
         <div id="debug-log"
             style="position:fixed; top:0; left:0; width:100%; max-height:80px; background:rgba(255,0,0,0.9); color:white; z-index:9999; overflow:auto; display:none; font-size:11px; padding:5px;">
         </div>
@@ -30,26 +28,22 @@
 
         <!-- Lobby Screen -->
         <div id="lobby" class="screen active">
-            <div id="version-label"
-                style="position:absolute; top:10px; right:10px; font-size:10px; color:rgba(255,255,255,0.3);">
-                v1.0.4-REHAB</div>
-            <h1>PİSANO POKER</h1>
+            <h1>Poker Room</h1>
             <div class="lobby-controls">
                 <div class="player-select">
-                    <label for="player-count">Table Capacity:</label>
+                    <label for="player-count">Players:</label>
                     <select id="player-count">
-                        <option value="2">2 Players (Heads Up)</option>
+                        <option value="2">2 Players</option>
                         <option value="3">3 Players</option>
                         <option value="4">4 Players</option>
                         <option value="5">5 Players</option>
                         <option value="6">6 Players</option>
-                        <option value="9">9 Players (Full Table)</option>
                     </select>
                 </div>
 
                 <div class="player-identity">
                     <div class="input-group-custom" style="position:relative; display:flex;">
-                        <input type="text" id="player-name" placeholder="Enter Your Nickname..." maxlength="12"
+                        <input type="text" id="player-name" placeholder="Your Name (Optional)" maxlength="12"
                             autocomplete="off" style="border-radius: 8px 0 0 8px; margin:0; flex:1;">
                         <button id="btn-toggle-names"
                             style="width:40px; border-radius: 0 8px 8px 0; margin:0; background:#333; border:1px solid #444; color:#f2c94c;">▼</button>
@@ -58,17 +52,15 @@
                         </div>
                     </div>
                     <label class="save-check" style="margin-top:5px;">
-                        <input type="checkbox" id="save-name-default" checked> Remember Device
+                        <input type="checkbox" id="save-name-default" checked> Save name
                     </label>
-                    <button id="btn-show-stats" class="secondary-btn" style="margin-top: 5px;">Player Profile</button>
+                    <button id="btn-show-stats" class="secondary-btn" style="margin-top: 5px;">View Stats</button>
                 </div>
 
-                <div class="main-actions">
-                    <button id="btn-create" style="width:100%; margin-bottom:10px;">CREATE NEW ROOM</button>
-                    <div class="join-form" style="display:flex; gap:5px;">
-                        <input type="text" id="inp-room-code" placeholder="Code..." maxlength="6" style="flex:1;">
-                        <button id="btn-join">JOIN</button>
-                    </div>
+                <button id="btn-create">Create Room</button>
+                <div class="join-form">
+                    <input type="text" id="inp-room-code" placeholder="Enter Room Code" maxlength="6">
+                    <button id="btn-join">Join Room</button>
                 </div>
             </div>
             <p class="status-msg" id="lobby-msg"></p>
@@ -79,12 +71,13 @@
             <div class="header">
                 <div class="room-info">Room: <span id="display-room-code"></span> | <span
                         id="player-count-display"></span></div>
-                <div id="btn-open-guide">🎴 Hands Guide</div>
-                <div class="pot-info">POT: $<span id="pot-amount">0</span></div>
+                <div id="btn-open-guide">🎴 Hands</div>
+                <div class="pot-info">Pot: <span id="pot-amount">0</span></div>
             </div>
 
+            <!-- Opponents Container (scrollable for 3+ players) -->
             <div id="opponents-container">
-                <!-- Opponents populate here -->
+                <!-- Dynamic opponent areas will be injected here -->
             </div>
 
             <!-- Board / Community Cards -->
@@ -102,59 +95,51 @@
                 <div class="status-bubble" id="player-status"></div>
                 <div class="cards" id="player-cards"></div>
                 <div class="player-info">
-                    <div class="avatar">👤</div>
+                    <div class="avatar">ME</div>
                     <div class="details">
-                        <span class="name">Syncing...</span>
-                        <span class="chips">$0</span>
+                        <span class="name">You</span>
+                        <span class="chips">$1000</span>
                     </div>
                 </div>
             </div>
 
             <div id="game-start-controls" style="display:none; text-align:center; margin-top:20px;">
                 <button id="btn-start-game"
-                    style="padding: 15px 30px; font-size: 1.2rem; background: var(--accent-gold); color: black;">SHUFFLE
-                    & DEAL</button>
+                    style="padding: 15px 30px; font-size: 1.2rem; background: var(--accent-gold); color: black;">START
+                    GAME</button>
                 <div id="host-waiting-msg" style="color: #ccc; font-style: italic; margin-top: 10px; display: none;">
-                    The Host is preparing the deck...</div>
+                    Waiting for Host to start...</div>
             </div>
 
             <!-- Controls -->
-            <div id="controls" style="display:none;">
+            <div id="controls">
                 <div class="action-bar">
                     <button class="btn-action fold" data-action="fold">Fold</button>
                     <button class="btn-action check" data-action="check">Check</button>
                     <button class="btn-action call" data-action="call">Call</button>
                     <button class="btn-action raise" data-action="raise">Raise</button>
                 </div>
-                <!-- Betting Shortcuts -->
-                <div id="betting-shortcuts" style="display:none; justify-content:center; gap:5px; margin-top:5px;">
-                    <button class="btn-shortcut" data-mult="0.5">1/2 Pot</button>
-                    <button class="btn-shortcut" data-mult="1.0">Pot</button>
-                    <button class="btn-shortcut" data-action="allin">All-in</button>
-                </div>
                 <div class="slider-container" id="raise-slider-container" style="display:none;">
-                    <span id="slider-label" style="font-size: 0.8rem; color: #ccc;">Amount:</span>
+                    <span id="slider-label" style="font-size: 0.8rem; color: #ccc;">Raise by:</span>
                     <input type="range" id="raise-slider" min="0" max="1000" step="1">
-                    <input type="number" id="raise-val" value="0" min="0" style="width:60px;">
-                    <button id="btn-confirm-raise">BET</button>
+                    <input type="number" id="raise-val" value="0" min="0">
+                    <button id="btn-confirm-raise">Bet</button>
                 </div>
-                <!-- Hand Strength Indicator -->
-                <div id="hand-strength"></div>
             </div>
 
             <div id="game-overlay" class="overlay" style="display:none;">
                 <div class="overlay-content">
-                    <h2 id="overlay-msg">Winner!</h2>
+                    <h2 id="overlay-msg">You Win!</h2>
                     <button id="btn-next-hand">Next Hand</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Music Player (Restored to User's Style) -->
+    <!-- Music Player -->
     <div id="music-player">
         <div class="track-info">
-            <span id="track-name">Loading Tracks...</span>
+            <span id="track-name">No Track</span>
         </div>
         <div class="controls">
             <button id="btn-prev">⏮</button>
@@ -165,7 +150,7 @@
             <span>🔊</span>
             <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="0.5">
         </div>
-        <audio id="bg-audio" preload="auto"></audio>
+        <audio id="bg-audio"></audio>
     </div>
 
     <!-- Modals -->
@@ -173,16 +158,36 @@
         <div class="modal-content">
             <h3>Poker Hands Rank</h3>
             <ul class="hands-list">
-                <li><strong>Royal Flush</strong> <span>A K Q J 10 (Same Suit)</span></li>
-                <li><strong>Straight Flush</strong> <span>5 Consecutive (Same Suit)</span></li>
-                <li><strong>Four of a Kind</strong> <span>4 of same Rank</span></li>
-                <li><strong>Full House</strong> <span>3 + 2 of same Rank</span></li>
-                <li><strong>Flush</strong> <span>5 of Same Suit</span></li>
-                <li><strong>Straight</strong> <span>5 Consecutive Rank</span></li>
-                <li><strong>Three of a Kind</strong> <span>3 of same Rank</span></li>
-                <li><strong>Two Pair</strong> <span>2 + 2 of same Rank</span></li>
-                <li><strong>One Pair</strong> <span>2 of same Rank</span></li>
-                <li><strong>High Card</strong> <span>Highest Card Wins</span></li>
+                <li><strong>Royal Flush</strong> <span>A<span class="card-black">♠</span> K<span
+                            class="card-black">♠</span> Q<span class="card-black">♠</span> J<span
+                            class="card-black">♠</span> 10<span class="card-black">♠</span></span></li>
+                <li><strong>Straight Flush</strong> <span>9<span class="card-red">♥</span> 8<span
+                            class="card-red">♥</span> 7<span class="card-red">♥</span> 6<span class="card-red">♥</span>
+                        5<span class="card-red">♥</span></span></li>
+                <li><strong>Four of a Kind</strong> <span>A<span class="card-black">♠</span> A<span
+                            class="card-red">♥</span> A<span class="card-black">♣</span> A<span
+                            class="card-red">♦</span> 5<span class="card-black">♠</span></span></li>
+                <li><strong>Full House</strong> <span>K<span class="card-black">♠</span> K<span
+                            class="card-red">♥</span> K<span class="card-black">♣</span> 2<span
+                            class="card-black">♠</span> 2<span class="card-red">♥</span></span></li>
+                <li><strong>Flush</strong> <span>A<span class="card-red">♦</span> J<span class="card-red">♦</span>
+                        8<span class="card-red">♦</span> 6<span class="card-red">♦</span> 2<span
+                            class="card-red">♦</span></span></li>
+                <li><strong>Straight</strong> <span>9<span class="card-black">♠</span> 8<span class="card-red">♥</span>
+                        7<span class="card-black">♣</span> 6<span class="card-red">♦</span> 5<span
+                            class="card-black">♠</span></span></li>
+                <li><strong>Three of a Kind</strong> <span>7<span class="card-black">♠</span> 7<span
+                            class="card-red">♥</span> 7<span class="card-black">♣</span> A<span
+                            class="card-black">♠</span> K<span class="card-red">♥</span></span></li>
+                <li><strong>Two Pair</strong> <span>J<span class="card-black">♠</span> J<span class="card-red">♥</span>
+                        4<span class="card-black">♠</span> 4<span class="card-red">♥</span> K<span
+                            class="card-black">♣</span></span></li>
+                <li><strong>One Pair</strong> <span>10<span class="card-black">♠</span> 10<span
+                            class="card-red">♥</span> A<span class="card-black">♠</span> K<span
+                            class="card-black">♣</span> 8<span class="card-red">♦</span></span></li>
+                <li><strong>High Card</strong> <span>A<span class="card-black">♠</span> J<span class="card-red">♥</span>
+                        8<span class="card-black">♣</span> 4<span class="card-red">♦</span> 2<span
+                            class="card-black">♠</span></span></li>
             </ul>
             <button class="btn-close-modal">Close</button>
         </div>
@@ -191,10 +196,11 @@
     <div id="tournament-over-overlay" class="modal-overlay" style="display:none;">
         <div class="modal-content" style="text-align: center;">
             <div style="font-size: 3rem; margin-bottom: 15px;">🏆</div>
-            <h2 id="tournament-champ-name"></h2>
-            <div class="tournament-actions">
+            <h2 id="tournament-champ-name" style="color: var(--accent-gold); margin-bottom: 20px;"></h2>
+            <p id="tournament-msg" style="margin-bottom: 30px; font-size: 1.1rem;"></p>
+            <div class="tournament-actions" style="display: flex; flex-direction: column; gap: 10px;">
                 <button id="btn-reset-game">Start from Scratch</button>
-                <button id="btn-back-lobby" class="secondary-btn">New Room</button>
+                <button id="btn-back-lobby" class="secondary-btn">Go to Main Menu</button>
             </div>
         </div>
     </div>
@@ -202,7 +208,7 @@
     <div id="modal-stats" class="modal-overlay" style="display:none;">
         <div class="modal-content">
             <h3>Player Stats: <span id="stats-name"></span></h3>
-            <div class="stats-grid" id="stats-container">
+            <div class="stats-grid">
                 <div>Hands Played: <span id="stats-played">0</span></div>
                 <div>Wins: <span id="stats-wins">0</span></div>
                 <div>Win Rate: <span id="stats-rate">0%</span></div>
@@ -212,8 +218,7 @@
         </div>
     </div>
 
-    <!-- Script Versioning to bypass Cache -->
-    <script type="module" src="game.js?v=FIN_REV"></script>
+    <script type="module" src="game.js"></script>
 </body>
 
 </html>
