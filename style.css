@@ -866,3 +866,61 @@ input {
     font-size: 1.2rem;
     padding: 5px 15px;
 }
+/* ===== Dealer / Blind badges ===== */
+.badges {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.badge {
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(242,201,76,0.35);
+  color: var(--accent-gold);
+}
+
+/* ===== All-in button style ===== */
+.btn-action.allin {
+  background: #6a1b9a;
+  color: #fff;
+}
+
+/* ===== Turn timer ===== */
+.turn-timer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(0,0,0,0.65);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+}
+
+.turn-timer .bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+#turn-timer-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent-gold);
+  transition: width 0.2s linear;
+}
+
+#turn-timer-text {
+  font-variant-numeric: tabular-nums;
+  min-width: 52px;
+  text-align: right;
+  color: #ddd;
+  font-size: 0.85rem;
+}

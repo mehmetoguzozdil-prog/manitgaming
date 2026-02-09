@@ -114,11 +114,17 @@
             <!-- Controls -->
             <div id="controls">
                 <div class="action-bar">
-                    <button class="btn-action fold" data-action="fold">Fold</button>
-                    <button class="btn-action check" data-action="check">Check</button>
-                    <button class="btn-action call" data-action="call">Call</button>
-                    <button class="btn-action raise" data-action="raise">Raise</button>
-                </div>
+  <button class="btn-action fold" data-action="fold">Fold</button>
+  <button class="btn-action check" data-action="check">Check</button>
+  <button class="btn-action call" data-action="call">Call</button>
+  <button class="btn-action raise" data-action="raise">Raise</button>
+  <button class="btn-action allin" data-action="allin">All-In</button>
+</div>
+<div class="turn-timer">
+  <span>⏱</span>
+  <div class="bar"><div id="turn-timer-fill"></div></div>
+  <span id="turn-timer-text">—</span>
+</div>
                 <div class="slider-container" id="raise-slider-container" style="display:none;">
                     <span id="slider-label" style="font-size: 0.8rem; color: #ccc;">Raise by:</span>
                     <input type="range" id="raise-slider" min="0" max="1000" step="1">
@@ -192,6 +198,10 @@
             <button class="btn-close-modal">Close</button>
         </div>
     </div>
+
+<audio id="sfx-chip" src="/chip.mp3" preload="auto"></audio>
+<audio id="sfx-card" src="/card.mp3" preload="auto"></audio>
+<audio id="sfx-win"  src="/win.mp3"  preload="auto"></audio>
 
     <div id="tournament-over-overlay" class="modal-overlay" style="display:none;">
         <div class="modal-content" style="text-align: center;">
