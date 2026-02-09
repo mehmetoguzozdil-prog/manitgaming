@@ -214,7 +214,7 @@ button:active {
 }
 
 /* Board */
-#community-cards {
+#board {
     display: flex;
     gap: 12px;
     margin: 40px auto;
