@@ -27,7 +27,8 @@ body {
 }
 /* Lobby */
 #lobby {
-    background: radial-gradient(circle, #2a5a3a 0%, #0d1e12 100%);
+    background: url('lobby-bg.jpg') no-repeat center center;
+    background-size: cover;
 }
 .lobby-controls {
     background: rgba(0, 0, 0, 0.6);

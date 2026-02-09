@@ -25,9 +25,11 @@ const TURN_TIME_LIMIT = 30000;
 // MUSIC PLAYER LOGIC (Restored & Robust)
 // ============================================
 const PLAYLIST = [
-    { name: "Neon Nights", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
-    { name: "Felt & Smoke", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
-    { name: "Midnight Bluff", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" }
+    { name: "Casino Ambience", url: "casino_ambience.mp3" },
+    { name: "Jazz Poker", url: "jazz_poker.mp3" },
+    { name: "Music", url: "music.mp3" },
+    { name: "Track 1", url: "track1.mp3" },
+    { name: "Track 2", url: "track2.mp3" }
 ];
 let currentTrackIdx = 0;
 const bgAudio = document.getElementById('bg-audio');
@@ -299,11 +301,13 @@ function showdown(state) {
         const share = Math.floor(pot.amount / winners.length);
         winners.forEach(w => {
             w.chips += share;
-            w.winningHand = results[w.id].hand.cards;
+            if (results[w.id] && results[w.id].hand) {
+                w.winningHand = results[w.id].hand.cards;
+            }
         });
         const extra = pot.amount % winners.length;
-        if (extra > 0) {
-            winners.sort((a, b) => ((a.id - state.dealer + state.players.length) % state.players.length) - ((b.id - state.dealer + state.players.length) % state.players.length));
+        if (extra > 0 && winners.length > 0) {
+            winners.sort((a, b) => ((a.id - (state.dealer || 0) + state.players.length) % state.players.length) - ((b.id - (state.dealer || 0) + state.players.length) % state.players.length));
             winners[0].chips += extra;
         }
     });
@@ -320,7 +324,7 @@ function showdown(state) {
 }
 async function recordPlayerStats(state, results) {
     for (const res of results) {
-        if (!res) continue;
+        if (!res || !state.players || !state.players[res.id]) continue;
         const p = state.players[res.id];
         if (!p.name || p.name === "Host" || p.name === "Player") continue;
         const key = p.name.replace(/[.#$/\[\]]/g, "");
@@ -346,20 +350,15 @@ function render(state) {
     const lobby = document.getElementById('lobby');
     const game = document.getElementById('game');
     if (state.status === 'waiting') {
-        lobby.classList.add('active'); game.classList.remove('active');
-        document.getElementById('display-room-code').textContent = myRoomId || "---";
-        document.getElementById('player-count-display').textContent = `${state.connectedCount}/${state.maxPlayers}`;
-        document.getElementById('game-start-controls').style.display = 'block';
-        document.getElementById('btn-start-game').style.display = (myPlayerIdx === 0) ? 'inline-block' : 'none';
-        document.getElementById('host-waiting-msg').style.display = (myPlayerIdx !== 0 && myPlayerIdx !== -1) ? 'block' : 'none';
         const list = document.getElementById('opponents-container');
-        list.innerHTML = state.players.filter(p => p.connected).map(p => `<div class="player-bubble">${p.avatar} ${p.name}</div>`).join('');
+        list.innerHTML = (state.players || []).filter(p => p && p.connected).map(p => `<div class="player-bubble">${p.avatar || '👤'} ${p.name || 'Player'}</div>`).join('');
     } else {
         lobby.classList.remove('active'); game.classList.add('active');
         renderTable(state);
     }
 }
 function renderTable(state) {
+    if (!state || !state.players) return;
     const me = state.players[myPlayerIdx];
     if (!me) return;
     document.getElementById('pot-amount').textContent = state.pot;
@@ -380,7 +379,7 @@ function renderTable(state) {
             div.innerHTML = `
                 ${state.currentPlayer === i ? `<div class="timer-circle">${Math.max(0, Math.ceil((state.turnEndTime - Date.now()) / 1000))}</div>` : ''}
                 <div class="status-bubble">${p.status || ''}</div>
-                <div class="cards">${p.cards.map(c => `<div class="card ${state.phase === 'showdown' ? 'revealed' : ''} ${isWinner && isWinner.some(wc => wc.rank === c.rank && wc.suit === c.suit) ? 'winner-highlight' : ''}"><div class="card-face card-back"></div><div class="card-face card-front ${c.suit}">${c.rank}</div></div>`).join('')}</div>
+                <div class="cards">${(p.cards || []).map(c => `<div class="card ${state.phase === 'showdown' ? 'revealed' : ''} ${isWinner && isWinner.some(wc => wc.rank === c.rank && wc.suit === c.suit) ? 'winner-highlight' : ''}"><div class="card-face card-back"></div><div class="card-face card-front ${c.suit}">${c.rank}</div></div>`).join('')}</div>
                 <div class="player-info"><div class="avatar">${p.avatar}</div><div class="details"><span>${p.name}</span><span class="chips">$${p.chips}</span></div></div>
             `;
             oppCont.appendChild(div);
