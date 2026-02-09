@@ -183,19 +183,25 @@ function nextActivePlayer(state, fromIdx) {
 function createNewGame(playerCount) {
   const players = [];
   for (let i = 0; i < playerCount; i++) {
-    players.push({
-      id: i,
-      name: `Player ${i + 1}`,
-      chips: STARTING_CHIPS,
-      cards: [],
-      bet: 0,
-      contributed: 0, // ✅ used for side pots
-      acted: false,   // ✅ per-street action tracking
-      folded: false,
-      allIn: false,
-      connected: false,
-      bankrupt: false
-    });
+   players.push({
+  id: i,
+  name: `Player ${i + 1}`,
+  chips: STARTING_CHIPS,
+  cards: [],
+  bet: 0,
+  contributed: 0,
+  acted: false,
+
+  // 👇 ADD THESE 3 LINES
+  actionCounts: { fold: 0, check: 0, call: 0, raise: 0, allin: 0 },
+  investedThisHand: 0,
+  wonThisHand: 0,
+
+  folded: false,
+  allIn: false,
+  connected: false,
+  bankrupt: false
+});
   }
 
   return {
@@ -252,6 +258,9 @@ function dealCards(state) {
     p.bet = 0;
     p.contributed = 0; // ✅ reset per hand
     p.acted = false;
+p.actionCounts = { fold: 0, check: 0, call: 0, raise: 0, allin: 0 };
+p.investedThisHand = 0;
+p.wonThisHand = 0;
     p.folded = false;
     p.allIn = false;
     // keep bankrupt/chips/connected/name
@@ -342,6 +351,7 @@ function contendersForPot(state, pot) {
 
 function showdown(state) {
   state.phase = "showdown";
+state.potAtShowdown = state.pot;
   console.log("SHOWDOWN!");
 
   const contenders = activePlayers(state);
@@ -379,6 +389,7 @@ function showdown(state) {
 
     winners.forEach((w) => {
       w.chips += share;
+w.wonThisHand = (w.wonThisHand || 0) + share;
       finalWinners.add(w.id);
     });
 
@@ -529,7 +540,9 @@ function handlePlayerAction(state, playerIdx, action, amount = 0) {
 
   if (action === "fold") {
     player.folded = true;
+player.actionCounts.fold++;
     player.acted = true;
+player.actionCounts.check++;
     state.message = `${player.name} folds`;
 
     const remaining = activePlayers(state);
@@ -545,6 +558,8 @@ function handlePlayerAction(state, playerIdx, action, amount = 0) {
     const callAmount = Math.min(toCall, player.chips);
     player.chips -= callAmount;
     player.bet += callAmount;
+player.actionCounts.call++;
+player.investedThisHand += callAmount;
     player.contributed += callAmount;
     state.pot += callAmount;
     player.allIn = player.chips === 0;
@@ -567,6 +582,8 @@ function handlePlayerAction(state, playerIdx, action, amount = 0) {
 
     player.chips -= totalNeeded;
     player.bet = newTotalBet;
+player.actionCounts.raise++;
+player.investedThisHand += totalNeeded;
     player.contributed += totalNeeded;
     state.pot += totalNeeded;
 
@@ -583,6 +600,8 @@ function handlePlayerAction(state, playerIdx, action, amount = 0) {
     const allInAmount = player.chips;
     player.chips = 0;
     player.bet += allInAmount;
+player.actionCounts.allin++;
+player.investedThisHand += allInAmount;
     player.contributed += allInAmount;
     state.pot += allInAmount;
     player.allIn = true;
@@ -1500,19 +1519,39 @@ async function displayStats(name) {
   const db = getDB();
   const key = name.replace(/[.#$/\[\]]/g, "");
   const snap = await get(ref(db, "playerStats/" + key));
-  const stats = snap.val() || { wins: 0, handsPlayed: 0, bestHandType: -1 };
 
-  document.getElementById("stats-name").textContent = name;
-  document.getElementById("stats-played").textContent = stats.handsPlayed;
-  document.getElementById("stats-wins").textContent = stats.wins;
+  const stats = snap.val() || {};
 
-  const rate = stats.handsPlayed > 0 ? Math.round((stats.wins / stats.handsPlayed) * 100) : 0;
+  const hands = stats.handsPlayed || 0;
+  const wins = stats.wins || 0;
+
+  document.getElementById("stats-played").textContent = hands;
+  document.getElementById("stats-wins").textContent = wins;
+
+  const rate = hands > 0 ? Math.round((wins / hands) * 100) : 0;
   document.getElementById("stats-rate").textContent = rate + "%";
-  document.getElementById("stats-best").textContent = stats.bestHandType !== -1 ? getHandName(stats.bestHandType) : "N/A";
+
+  document.getElementById("stats-best").textContent =
+    typeof stats.bestHandType === "number" && stats.bestHandType !== -1
+      ? getHandName(stats.bestHandType)
+      : "N/A";
+
+  // Action stats
+  document.getElementById("stats-folds").textContent = stats.folds || 0;
+  document.getElementById("stats-checks").textContent = stats.checks || 0;
+  document.getElementById("stats-calls").textContent = stats.calls || 0;
+  document.getElementById("stats-raises").textContent = stats.raises || 0;
+  document.getElementById("stats-allins").textContent = stats.allIns || 0;
+
+  // Money stats
+  document.getElementById("stats-invested").textContent = "$" + (stats.totalInvested || 0);
+  document.getElementById("stats-won").textContent = "$" + (stats.totalWon || 0);
+  document.getElementById("stats-net").textContent = "$" + (stats.net || 0);
+  document.getElementById("stats-bigwin").textContent = "$" + (stats.biggestWin || 0);
+  document.getElementById("stats-bigpot").textContent = "$" + (stats.biggestPotWon || 0);
 
   modalStats.style.display = "flex";
 }
-
 loadSavedNames();
 initDropdown();
 
