@@ -3,7 +3,6 @@
 // ============================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, set, onValue, get, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-
 // ============================================
 // CONFIG & CONSTANTS
 // ============================================
@@ -16,15 +15,12 @@ const firebaseConfig = {
     messagingSenderId: "696580761179",
     appId: "1:696580761179:web:98fa7890e446f282bb017e"
 };
-
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
-
 const SMALL_BLIND = 10;
 const BIG_BLIND = 20;
 const STARTING_CHIPS = 1000;
 const TURN_TIME_LIMIT = 30000;
-
 // ============================================
 // MUSIC PLAYER LOGIC (Restored & Robust)
 // ============================================
@@ -36,7 +32,6 @@ const PLAYLIST = [
 let currentTrackIdx = 0;
 const bgAudio = document.getElementById('bg-audio');
 const trackNameEl = document.getElementById('track-name');
-
 function initMusic() {
     if (!bgAudio) return;
     updateTrack();
@@ -54,20 +49,17 @@ function initMusic() {
     document.getElementById('volume-slider').oninput = (e) => { bgAudio.volume = e.target.value; };
     bgAudio.volume = 0.5;
 }
-
 function updateTrack() {
     const track = PLAYLIST[currentTrackIdx];
     bgAudio.src = track.url;
     trackNameEl.textContent = track.name;
     bgAudio.load();
 }
-
 // ============================================
 // CARD & HAND LOGIC
 // ============================================
 const SUITS = ['hearts', 'diamonds', 'clubs', 'spades'];
 const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-
 function createDeck() {
     const deck = [];
     for (const suit of SUITS) for (const rank of RANKS) deck.push({ suit, rank });
@@ -77,12 +69,10 @@ function createDeck() {
     }
     return deck;
 }
-
 function getCardValue(rank) {
     const vals = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14 };
     return vals[rank];
 }
-
 function evaluateHand(cards) {
     if (cards.length < 1) return { type: 0, subValues: [0] };
     const sorted = [...cards].sort((a, b) => getCardValue(b.rank) - getCardValue(a.rank));
@@ -90,7 +80,6 @@ function evaluateHand(cards) {
     const suits = sorted.map(c => c.suit);
     const isFlush = suits.length >= 5 && suits.every(s => s === suits[0]);
     const uniqueVals = [...new Set(values)];
-
     let isStraight = false;
     let straightHigh = -1;
     if (uniqueVals.length >= 5) {
@@ -102,14 +91,12 @@ function evaluateHand(cards) {
             if (uniqueVals.includes(4) && uniqueVals.includes(3)) { isStraight = true; straightHigh = 5; }
         }
     }
-
     const counts = {};
     values.forEach(v => counts[v] = (counts[v] || 0) + 1);
     const pairs = Object.entries(counts).filter(e => e[1] === 2).map(e => parseInt(e[0])).sort((a, b) => b - a);
     const trips = Object.entries(counts).filter(e => e[1] === 3).map(e => parseInt(e[0])).sort((a, b) => b - a);
     const quads = Object.entries(counts).filter(e => e[1] === 4).map(e => parseInt(e[0])).sort((a, b) => b - a);
     const singles = Object.entries(counts).filter(e => e[1] === 1).map(e => parseInt(e[0])).sort((a, b) => b - a);
-
     if (isFlush && isStraight) return { type: 8, subValues: [straightHigh] };
     if (quads.length > 0) return { type: 7, subValues: [quads[0], singles[0] || 0] };
     if (trips.length > 0 && pairs.length > 0) return { type: 6, subValues: [trips[0], pairs[0]] };
@@ -120,7 +107,6 @@ function evaluateHand(cards) {
     if (pairs.length === 1) return { type: 1, subValues: [pairs[0], ...singles.slice(0, 3)] };
     return { type: 0, subValues: values.slice(0, 5) };
 }
-
 function compareHands(h1, h2) {
     if (h1.type !== h2.type) return h1.type - h2.type;
     for (let i = 0; i < Math.max(h1.subValues.length, h2.subValues.length); i++) {
@@ -130,7 +116,6 @@ function compareHands(h1, h2) {
     }
     return 0;
 }
-
 function getBestHand(allCards) {
     if (allCards.length < 5) {
         const h = evaluateHand(allCards);
@@ -144,7 +129,6 @@ function getBestHand(allCards) {
     }
     return best;
 }
-
 function getCombinations(arr, k) {
     if (k === 1) return arr.map(x => [x]);
     const result = [];
@@ -154,15 +138,12 @@ function getCombinations(arr, k) {
     }
     return result;
 }
-
 function getHandName(type) {
     return ["High Card", "Pair", "Two Pair", "Three of a Kind", "Straight", "Flush", "Full House", "Four of a Kind", "Straight Flush"][type] || "Unknown";
 }
-
 // ============================================
 // CORE ENGINE
 // ============================================
-
 function createNewGame(playerCount) {
     const players = [];
     for (let i = 0; i < playerCount; i++) {
@@ -178,7 +159,6 @@ function createNewGame(playerCount) {
         actedThisRound: 0, turnEndTime: 0, winner: null, message: 'Welcome to the table!'
     };
 }
-
 function dealCards(state) {
     state.deck = createDeck();
     state.community = [];
@@ -190,17 +170,14 @@ function dealCards(state) {
     state.actedThisRound = 0;
     state.turnEndTime = Date.now() + TURN_TIME_LIMIT;
     state.isGameOver = false;
-
     state.players.forEach(p => {
         p.cards = []; p.bet = 0; p.contributed = 0; p.status = '';
         p.folded = !(p.connected && !p.bankrupt && p.chips > 0);
         p.allIn = false;
         p.winningHand = null;
     });
-
     const active = state.players.filter(p => !p.folded);
     active.forEach(p => p.cards = [state.deck.pop(), state.deck.pop()]);
-
     let sbPtr, bbPtr;
     if (active.length === 2) {
         sbPtr = state.dealer;
@@ -209,15 +186,12 @@ function dealCards(state) {
         sbPtr = findNextPlayer(state, state.dealer);
         bbPtr = findNextPlayer(state, sbPtr);
     }
-
     applyBet(state, sbPtr, SMALL_BLIND, "SB");
     applyBet(state, bbPtr, BIG_BLIND, "BB");
-
     state.currentPlayer = (active.length === 2) ? sbPtr : findNextPlayer(state, bbPtr);
     state.lastRaise = bbPtr;
     return state;
 }
-
 function applyBet(state, idx, amount, status = "") {
     const p = state.players[idx];
     if (!p) return;
@@ -229,7 +203,6 @@ function applyBet(state, idx, amount, status = "") {
     state.pot += actual;
     if (status) p.status = status;
 }
-
 function findNextPlayer(state, fromIdx) {
     let idx = (fromIdx + 1) % state.players.length;
     for (let i = 0; i < state.players.length; i++) {
@@ -239,12 +212,10 @@ function findNextPlayer(state, fromIdx) {
     }
     return -1;
 }
-
 function handleAction(state, playerIdx, action, amount = 0) {
     if (state.currentPlayer !== playerIdx) return state;
     const player = state.players[playerIdx];
     const toCall = state.currentBet - player.bet;
-
     if (action === 'fold') {
         player.folded = true;
         player.status = "Fold";
@@ -268,7 +239,6 @@ function handleAction(state, playerIdx, action, amount = 0) {
             state.actedThisRound = 0;
         }
     }
-
     state.actedThisRound++;
     if (isRoundOver(state)) return advancePhase(state);
     state.currentPlayer = findNextPlayer(state, playerIdx);
@@ -276,38 +246,31 @@ function handleAction(state, playerIdx, action, amount = 0) {
     if (state.currentPlayer === -1) return advancePhase(state);
     return state;
 }
-
 function isRoundOver(state) {
     const active = state.players.filter(p => !p.folded && !p.bankrupt && !p.allIn);
     if (active.length <= 1) return true;
     const allMatched = active.every(p => p.bet === state.currentBet);
     return allMatched && state.actedThisRound >= active.length;
 }
-
 function advancePhase(state) {
     state.players.forEach(p => { p.bet = 0; if (p.status !== "All-in" && !p.folded) p.status = ""; });
     state.currentBet = 0;
     state.actedThisRound = 0;
-
     if (state.phase === 'preflop') state.phase = 'flop';
     else if (state.phase === 'flop') state.phase = 'turn';
     else if (state.phase === 'turn') state.phase = 'river';
     else if (state.phase === 'river') return showdown(state);
-
     if (state.phase === 'flop') state.community.push(state.deck.pop(), state.deck.pop(), state.deck.pop());
     else state.community.push(state.deck.pop());
-
     const canAct = state.players.filter(p => !p.folded && !p.bankrupt && !p.allIn);
     if (canAct.length <= 1) {
         while (state.community.length < 5) state.community.push(state.deck.pop());
         return showdown(state);
     }
-
     state.currentPlayer = findNextPlayer(state, state.dealer);
     state.turnEndTime = Date.now() + TURN_TIME_LIMIT;
     return state;
 }
-
 function calculateSidePots(state) {
     const contribs = state.players.map(p => ({ id: p.id, amt: p.contributed, f: p.folded })).filter(c => c.amt > 0);
     const levels = [...new Set(contribs.map(c => c.amt))].sort((a, b) => a - b);
@@ -322,12 +285,10 @@ function calculateSidePots(state) {
     });
     return pots;
 }
-
 function showdown(state) {
     state.phase = 'showdown';
     const pots = calculateSidePots(state);
     const results = state.players.map(p => (p.folded || p.bankrupt) ? null : { id: p.id, hand: getBestHand([...p.cards, ...state.community]) });
-
     pots.forEach(pot => {
         let best = null, winners = [];
         pot.eligible.forEach(id => {
@@ -346,7 +307,6 @@ function showdown(state) {
             winners[0].chips += extra;
         }
     });
-
     state.pot = 0;
     state.players.forEach(p => { if (p.chips <= 0 && p.connected) p.bankrupt = true; });
     const alive = state.players.filter(p => !p.bankrupt && p.connected);
@@ -358,7 +318,6 @@ function showdown(state) {
     recordPlayerStats(state, results);
     return state;
 }
-
 async function recordPlayerStats(state, results) {
     for (const res of results) {
         if (!res) continue;
@@ -374,17 +333,14 @@ async function recordPlayerStats(state, results) {
         set(statsRef, s);
     }
 }
-
 // ============================================
 // UI & PERSISTENCE
 // ============================================
 let myRoomId = sessionStorage.getItem('poker_room_id') || null;
 let myPlayerIdx = parseInt(sessionStorage.getItem('poker_player_idx'));
 if (isNaN(myPlayerIdx)) myPlayerIdx = -1;
-
 const nameInput = document.getElementById('player-name');
 if (nameInput) nameInput.value = localStorage.getItem('poker_player_name') || "";
-
 function render(state) {
     if (!state) return;
     const lobby = document.getElementById('lobby');
@@ -396,7 +352,6 @@ function render(state) {
         document.getElementById('game-start-controls').style.display = 'block';
         document.getElementById('btn-start-game').style.display = (myPlayerIdx === 0) ? 'inline-block' : 'none';
         document.getElementById('host-waiting-msg').style.display = (myPlayerIdx !== 0 && myPlayerIdx !== -1) ? 'block' : 'none';
-
         const list = document.getElementById('opponents-container');
         list.innerHTML = state.players.filter(p => p.connected).map(p => `<div class="player-bubble">${p.avatar} ${p.name}</div>`).join('');
     } else {
@@ -404,19 +359,16 @@ function render(state) {
         renderTable(state);
     }
 }
-
 function renderTable(state) {
     const me = state.players[myPlayerIdx];
     if (!me) return;
     document.getElementById('pot-amount').textContent = state.pot;
     document.getElementById('display-room-code').textContent = myRoomId;
-
     const strengthEl = document.getElementById('hand-strength');
     if (!me.folded && state.status === 'playing') {
         const best = getBestHand([...me.cards, ...state.community]);
         strengthEl.textContent = best ? `Hand: ${getHandName(best.type)}` : "";
     } else strengthEl.textContent = "";
-
     const oppCont = document.getElementById('opponents-container');
     oppCont.innerHTML = '';
     state.players.forEach((p, i) => {
@@ -434,27 +386,22 @@ function renderTable(state) {
             oppCont.appendChild(div);
         }
     });
-
     const board = document.getElementById('board');
     board.innerHTML = state.community.map(c => `<div class="card revealed"><div class="card-face card-back"></div><div class="card-face card-front ${c.suit}">${c.rank}</div></div>`).join('') + Array(5 - state.community.length).fill('<div class="card-slot"></div>').join('');
-
     document.getElementById('controls').style.display = (state.currentPlayer === myPlayerIdx) ? 'block' : 'none';
     const toCall = state.currentBet - me.bet;
     document.querySelector('.call').textContent = toCall > 0 ? `Call ${toCall}` : 'Check';
     document.getElementById('betting-shortcuts').style.display = 'flex';
-
     const overlay = document.getElementById('game-overlay');
     if (state.phase === 'finished') {
         overlay.style.display = 'flex';
         document.getElementById('overlay-msg').textContent = state.message;
     } else overlay.style.display = 'none';
-
     if (state.isGameOver) {
         document.getElementById('tournament-over-overlay').style.display = 'flex';
         document.getElementById('tournament-champ-name').textContent = state.message;
     }
 }
-
 function renderMe(p, state) {
     const area = document.getElementById('player-area');
     area.className = `player-area me ${state.currentPlayer === myPlayerIdx ? 'active-turn' : ''}`;
@@ -472,11 +419,9 @@ function renderMe(p, state) {
         t.textContent = Math.max(0, Math.ceil((state.turnEndTime - Date.now()) / 1000));
     }
 }
-
 // ============================================
 // MAIN HANDLERS
 // ============================================
-
 document.getElementById('btn-create').onclick = async () => {
     const name = document.getElementById('player-name').value || "Host";
     const count = parseInt(document.getElementById('player-count').value);
@@ -489,7 +434,6 @@ document.getElementById('btn-create').onclick = async () => {
     await set(ref(database, 'rooms/' + id), state);
     onValue(ref(database, 'rooms/' + id), (s) => render(s.val()));
 };
-
 document.getElementById('btn-join').onclick = async () => {
     const id = document.getElementById('inp-room-code').value.toUpperCase();
     const name = document.getElementById('player-name').value || "Player";
@@ -506,7 +450,6 @@ document.getElementById('btn-join').onclick = async () => {
     await set(roomRef, state);
     onValue(roomRef, (s) => render(s.val()));
 };
-
 document.querySelectorAll('.btn-action').forEach(btn => {
     btn.onclick = async () => {
         const action = btn.dataset.action;
@@ -521,27 +464,23 @@ document.querySelectorAll('.btn-action').forEach(btn => {
         set(ref(database, 'rooms/' + myRoomId), handleAction(state, myPlayerIdx, action));
     };
 });
-
 document.getElementById('btn-confirm-raise').onclick = async () => {
     const amt = parseInt(document.getElementById('raise-val').value);
     const state = (await get(ref(database, 'rooms/' + myRoomId))).val();
     document.getElementById('raise-slider-container').style.display = 'none';
     set(ref(database, 'rooms/' + myRoomId), handleAction(state, myPlayerIdx, 'raise', amt));
 };
-
 document.getElementById('btn-start-game').onclick = async () => {
     const roomRef = ref(database, 'rooms/' + myRoomId);
     const state = (await get(roomRef)).val();
     set(roomRef, dealCards(state));
 };
-
 document.getElementById('btn-next-hand').onclick = async () => {
     const roomRef = ref(database, 'rooms/' + myRoomId);
     const state = (await get(roomRef)).val();
     state.dealer = (state.dealer + 1) % state.players.length;
     set(roomRef, dealCards(state));
 };
-
 document.querySelectorAll('.btn-shortcut').forEach(btn => {
     btn.onclick = async () => {
         const state = (await get(ref(database, 'rooms/' + myRoomId))).val();
@@ -549,7 +488,6 @@ document.querySelectorAll('.btn-shortcut').forEach(btn => {
         else set(ref(database, 'rooms/' + myRoomId), handleAction(state, myPlayerIdx, 'raise', Math.floor(state.pot * parseFloat(btn.dataset.mult))));
     };
 });
-
 // Name Dropdown
 document.getElementById('btn-toggle-names').onclick = () => {
     const list = document.getElementById('custom-name-list');
@@ -563,8 +501,6 @@ document.getElementById('btn-toggle-names').onclick = () => {
         });
     }, { onlyOnce: true });
 };
-
 // Auto-Reconnect
 if (myRoomId) onValue(ref(database, 'rooms/' + myRoomId), (s) => render(s.val()));
-
 initMusic();
