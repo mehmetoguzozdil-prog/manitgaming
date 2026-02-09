@@ -924,3 +924,11 @@ input {
   color: #ddd;
   font-size: 0.85rem;
 }
+/* ===== Mobile Lobby Background Override ===== */
+@media (max-width: 768px) {
+  #lobby {
+    background: url('lobby-bg-mobile.jpg') no-repeat center center fixed;
+    background-size: cover;
+    background-color: #0b0c10;
+  }
+}
