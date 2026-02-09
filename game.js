@@ -251,7 +251,7 @@ function nextActivePlayer(state, fromIdx) {
     let count = 0;
     while (count < state.players.length) {
         const p = state.players[idx];
-        if (p.connected && !p.folded && !p.allIn) return idx;
+        if (p.connected && !p.folded && !p.allIn && !p.bankrupt) return idx;
         idx = (idx + 1) % state.players.length;
         count++;
     }
@@ -289,11 +289,17 @@ function showdown(state) {
 
     // Distribute pot
     const share = Math.floor(state.pot / winners.length);
-    state.pot = 0; // RESET POT IMMEDIATELY
+    const totalDistributed = share * winners.length;
+
+    // Give pot to winners
     winners.forEach(w => {
         w.chips += share;
-        console.log(`Winner ${w.name} gets ${share} chips. New total: ${w.chips}`);
+        console.log(`Giving ${share} to ${w.name}. New total: ${w.chips}`);
     });
+
+    // Clear pot
+    state.pot = 0;
+
 
     state.winner = winners.length === 1 ? winners[0].id : 'split';
 
@@ -308,7 +314,27 @@ function showdown(state) {
     state.message = winMsg;
     state.phase = 'finished';
 
-    // Record stats for all active players - FIX: await this!
+    // Bankruptcy check
+    state.players.forEach(p => {
+        if (p.chips <= 0 && p.connected) {
+            console.log(`Player ${p.name} is bankrupt!`);
+            p.bankrupt = true;
+            p.chips = 0;
+        }
+    });
+
+    // Tournament Over check
+    const alive = state.players.filter(p => !p.bankrupt && p.connected);
+    if (alive.length <= 1) {
+        state.isGameOver = true;
+        const champ = alive[0];
+        state.message = champ
+            ? `🏆 TOURNAMENT OVER! ${champ.name} is the CHAMPION! 🏆`
+            : "GAME OVER! No one has chips left.";
+        state.status = 'finished';
+    }
+
+    // Record stats for all active players
     recordPlayerStats(state, contenders, winners, bestHand);
 
     return state;
@@ -349,7 +375,9 @@ async function recordPlayerStats(state, players, winners, bestHand) {
 function endHand(state, winnerId) {
     const winner = state.players.find(p => p.id === winnerId);
     if (winner) {
+        console.log(`Giving pot ${state.pot} to ${winner.name}. Chips before: ${winner.chips}`);
         winner.chips += state.pot;
+        console.log(`Chips after: ${winner.chips}`);
         state.message = `${winner.name} wins the pot!`;
     }
     state.pot = 0;
