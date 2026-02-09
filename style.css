@@ -932,3 +932,42 @@ input {
     background-color: #0b0c10;
   }
 }
+/* ===== MOBILE OVERRIDES (paste at end of file) ===== */
+@media (max-width: 600px) {
+
+  /* 1) Stats: show all items nicely */
+  .modal-content {
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .stats-grid div {
+    padding: 10px !important;
+    font-size: 0.82rem !important;
+  }
+
+  .stats-grid span {
+    font-size: 1.05rem !important;
+  }
+
+  /* 2) Opponents: ensure player 5/6 are reachable */
+  #opponents-container {
+    flex-wrap: nowrap !important;      /* stop wrapping into hidden rows */
+    overflow-x: auto !important;       /* swipe horizontally */
+    overflow-y: hidden !important;
+    max-height: none !important;       /* remove clipping */
+    justify-content: flex-start !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #opponents-container .player-area {
+    min-width: 140px;
+    max-width: 160px;
+    flex: 0 0 auto;
+  }
+}
