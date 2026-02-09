@@ -2,7 +2,7 @@
 // FIREBASE ES MODULE IMPORTS
 // ============================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, set, onValue, get, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, set, onValue, get, remove, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 // ============================================
 // CONFIG & CONSTANTS
@@ -23,27 +23,39 @@ const database = getDatabase(app);
 const SMALL_BLIND = 10;
 const BIG_BLIND = 20;
 const STARTING_CHIPS = 1000;
-const TURN_TIME_LIMIT = 30000; // 30s
+const TURN_TIME_LIMIT = 30000;
 
 // ============================================
-// AUDIO MANAGER (Phase 3)
+// MUSIC PLAYER LOGIC (Restored)
 // ============================================
-const sounds = {
-    deal: new Audio('https://assets.mixkit.co/active_storage/sfx/2012/2012-preview.mp3'),
-    chips: new Audio('https://assets.mixkit.co/active_storage/sfx/1070/1070-preview.mp3'),
-    alert: new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3')
-};
+const PLAYLIST = [
+    { name: "Neon Nights", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
+    { name: "Felt & Smoke", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
+    { name: "Midnight Bluff", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" }
+];
+let currentTrackIdx = 0;
+const bgAudio = document.getElementById('bg-audio');
+const trackNameEl = document.getElementById('track-name');
 
-function playSound(name) {
-    const s = sounds[name];
-    if (s) {
-        s.currentTime = 0;
-        s.play().catch(e => console.log("Audio play blocked"));
-    }
+function initMusic() {
+    updateTrack();
+    document.getElementById('btn-play').onclick = () => {
+        if (bgAudio.paused) { bgAudio.play(); document.getElementById('btn-play').textContent = "⏸"; }
+        else { bgAudio.pause(); document.getElementById('btn-play').textContent = "▶"; }
+    };
+    document.getElementById('btn-next').onclick = () => { currentTrackIdx = (currentTrackIdx + 1) % PLAYLIST.length; updateTrack(); bgAudio.play(); };
+    document.getElementById('btn-prev').onclick = () => { currentTrackIdx = (currentTrackIdx - 1 + PLAYLIST.length) % PLAYLIST.length; updateTrack(); bgAudio.play(); };
+    document.getElementById('volume-slider').oninput = (e) => { bgAudio.volume = e.target.value; };
+}
+
+function updateTrack() {
+    const track = PLAYLIST[currentTrackIdx];
+    bgAudio.src = track.url;
+    trackNameEl.textContent = track.name;
 }
 
 // ============================================
-// CARD LOGIC & HAND EVALUATION
+// CARD & HAND LOGIC
 // ============================================
 const SUITS = ['hearts', 'diamonds', 'clubs', 'spades'];
 const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
@@ -106,9 +118,8 @@ function compareHands(h1, h2) {
 }
 
 function getBestHand(allCards) {
-    if (allCards.length < 5) return { ...evaluateHand(allCards), cards: allCards };
-    let best = null;
     const combos = getCombinations(allCards, 5);
+    let best = null;
     for (const combo of combos) {
         const h = evaluateHand(combo);
         if (!best || compareHands(h, best) > 0) best = { ...h, cards: combo };
@@ -131,19 +142,22 @@ function getHandName(type) {
 }
 
 // ============================================
-// GAME LOGIC CORE
+// CORE ENGINE
 // ============================================
 
 function createNewGame(playerCount) {
     const players = [];
     for (let i = 0; i < playerCount; i++) {
-        players.push({ id: i, name: `Player ${i + 1}`, chips: STARTING_CHIPS, cards: [], bet: 0, contributed: 0, folded: false, allIn: false, bankrupt: false, connected: false, avatar: '👤' });
+        players.push({
+            id: i, name: `Player ${i + 1}`, chips: STARTING_CHIPS, cards: [], bet: 0, contributed: 0,
+            folded: false, allIn: false, bankrupt: false, connected: false, avatar: '👤', status: ''
+        });
     }
     return {
         status: 'waiting', maxPlayers: playerCount, connectedCount: 0,
         deck: [], community: [], pot: 0, pots: [], phase: 'waiting',
-        dealer: 0, currentPlayer: 0, lastRaise: 0, currentBet: 0, minRaise: BIG_BLIND,
-        actedThisRound: 0, turnEndTime: 0, isGameOver: false, message: ''
+        dealer: 0, currentPlayer: -1, lastRaise: -1, currentBet: 0, minRaise: BIG_BLIND,
+        actedThisRound: 0, turnEndTime: 0, winner: null, message: 'Welcome to the table!'
     };
 }
 
@@ -159,9 +173,10 @@ function dealCards(state) {
     state.turnEndTime = Date.now() + TURN_TIME_LIMIT;
 
     state.players.forEach(p => {
-        p.cards = []; p.bet = 0; p.contributed = 0;
+        p.cards = []; p.bet = 0; p.contributed = 0; p.status = '';
         p.folded = !(p.connected && !p.bankrupt && p.chips > 0);
         p.allIn = false;
+        p.winningHand = null;
     });
 
     const active = state.players.filter(p => !p.folded);
@@ -176,16 +191,15 @@ function dealCards(state) {
         bbPtr = findNextPlayer(state, sbPtr);
     }
 
-    applyBet(state, sbPtr, SMALL_BLIND);
-    applyBet(state, bbPtr, BIG_BLIND);
+    applyBet(state, sbPtr, SMALL_BLIND, "SB");
+    applyBet(state, bbPtr, BIG_BLIND, "BB");
 
     state.currentPlayer = (active.length === 2) ? sbPtr : findNextPlayer(state, bbPtr);
     state.lastRaise = bbPtr;
-    playSound('deal');
     return state;
 }
 
-function applyBet(state, idx, amount) {
+function applyBet(state, idx, amount, status = "") {
     const p = state.players[idx];
     const actual = Math.min(p.chips, amount);
     p.chips -= actual;
@@ -193,6 +207,7 @@ function applyBet(state, idx, amount) {
     p.contributed += actual;
     p.allIn = p.chips === 0;
     state.pot += actual;
+    if (status) p.status = status;
 }
 
 function findNextPlayer(state, fromIdx) {
@@ -212,20 +227,21 @@ function handleAction(state, playerIdx, action, amount = 0) {
 
     if (action === 'fold') {
         player.folded = true;
+        player.status = "Fold";
     } else if (action === 'check') {
         if (toCall > 0) return state;
+        player.status = "Check";
     } else if (action === 'call') {
-        applyBet(state, playerIdx, toCall);
+        applyBet(state, playerIdx, toCall, "Call");
     } else if (action === 'raise') {
         const total = toCall + amount;
         if (total > player.chips) return state;
-        applyBet(state, playerIdx, total);
+        applyBet(state, playerIdx, total, `Raise ${amount}`);
         state.currentBet = player.bet;
         state.lastRaise = playerIdx;
-        state.actedThisRound = 0; // Reset
+        state.actedThisRound = 0;
     } else if (action === 'allin') {
-        const chips = player.chips;
-        applyBet(state, playerIdx, chips);
+        applyBet(state, playerIdx, player.chips, "All-in");
         if (player.bet > state.currentBet) {
             state.currentBet = player.bet;
             state.lastRaise = playerIdx;
@@ -234,13 +250,10 @@ function handleAction(state, playerIdx, action, amount = 0) {
     }
 
     state.actedThisRound++;
-    playSound('chips');
-
     if (isRoundOver(state)) return advancePhase(state);
     state.currentPlayer = findNextPlayer(state, playerIdx);
     state.turnEndTime = Date.now() + TURN_TIME_LIMIT;
     if (state.currentPlayer === -1) return advancePhase(state);
-
     return state;
 }
 
@@ -252,7 +265,7 @@ function isRoundOver(state) {
 }
 
 function advancePhase(state) {
-    state.players.forEach(p => p.bet = 0);
+    state.players.forEach(p => { p.bet = 0; if (p.status !== "All-in" && !p.folded) p.status = ""; });
     state.currentBet = 0;
     state.actedThisRound = 0;
 
@@ -261,11 +274,10 @@ function advancePhase(state) {
     else if (state.phase === 'turn') state.phase = 'river';
     else if (state.phase === 'river') return showdown(state);
 
-    const burn = state.deck.pop();
     if (state.phase === 'flop') state.community.push(state.deck.pop(), state.deck.pop(), state.deck.pop());
     else state.community.push(state.deck.pop());
 
-    const canAct = state.players.filter(p => p.connected && !p.folded && !p.bankrupt && !p.allIn);
+    const canAct = state.players.filter(p => !p.folded && !p.bankrupt && !p.allIn);
     if (canAct.length <= 1) {
         while (state.community.length < 5) state.community.push(state.deck.pop());
         return showdown(state);
@@ -283,8 +295,8 @@ function calculateSidePots(state) {
     let prev = 0;
     levels.forEach(lvl => {
         const slice = lvl - prev;
-        const participants = contribs.filter(c => c.amt >= lvl).length;
         const eligible = contribs.filter(c => c.amt >= lvl && !c.f).map(c => c.id);
+        const participants = contribs.filter(c => c.amt >= lvl).length;
         if (eligible.length > 0) pots.push({ amount: slice * participants, eligible });
         prev = lvl;
     });
@@ -304,12 +316,12 @@ function showdown(state) {
             else if (compareHands(h, best) === 0) winners.push(state.players[id]);
         });
         const share = Math.floor(pot.amount / winners.length);
-        winners.forEach(w => w.chips += share);
+        winners.forEach(w => {
+            w.chips += share;
+            w.winningHand = results[w.id].hand.cards;
+        });
         const extra = pot.amount % winners.length;
-        if (extra > 0) {
-            winners.sort((a, b) => ((a.id - state.dealer + state.players.length) % state.players.length) - ((b.id - state.dealer + state.players.length) % state.players.length));
-            winners[0].chips += extra;
-        }
+        if (extra > 0) winners[0].chips += extra;
     });
 
     state.pot = 0;
@@ -317,31 +329,51 @@ function showdown(state) {
     const alive = state.players.filter(p => !p.bankrupt && p.connected);
     if (alive.length === 1) {
         state.isGameOver = true;
-        state.message = `🏆 ${alive[0].name} wins the tournament!`;
-    } else {
-        state.message = "Hand finished.";
-    }
+        state.message = `🏆 ${alive[0].name} is the CHAMPION!`;
+    } else state.message = "Hand Finished.";
     state.phase = 'finished';
+
+    // Record Stats (Restored)
+    recordPlayerStats(state, results);
+
     return state;
 }
 
+async function recordPlayerStats(state, results) {
+    try {
+        for (const res of results) {
+            if (!res) continue;
+            const p = state.players[res.id];
+            if (!p.name || p.name === "You") continue;
+            const key = p.name.replace(/[.#$/\[\]]/g, "");
+            const statsRef = ref(database, 'playerStats/' + key);
+            const snap = await get(statsRef);
+            let stats = snap.val() || { wins: 0, handsPlayed: 0, bestHandType: -1 };
+
+            stats.handsPlayed++;
+            if (p.winningHand) stats.wins++;
+            if (res.hand.type > (stats.bestHandType || -1)) stats.bestHandType = res.hand.type;
+            await set(statsRef, stats);
+        }
+    } catch (e) {
+        console.error("Stats record failed:", e);
+    }
+}
+
 // ============================================
-// UI RENDERING & EVENTS
+// UI & EVENTS (Restored Features)
 // ============================================
 let myRoomId = null;
 let myPlayerIdx = -1;
 
 function render(state) {
-    const app = document.getElementById('app');
     const lobby = document.getElementById('lobby');
     const game = document.getElementById('game');
-
     if (state.status === 'waiting') {
         lobby.classList.add('active'); game.classList.remove('active');
-        document.getElementById('display-room-code').textContent = myRoomId;
+        document.getElementById('display-room-code').textContent = myRoomId || "---";
         document.getElementById('player-count-display').textContent = `${state.connectedCount}/${state.maxPlayers}`;
-        const startGroup = document.getElementById('game-start-controls');
-        startGroup.style.display = 'block';
+        document.getElementById('game-start-controls').style.display = 'block';
         document.getElementById('btn-start-game').style.display = (myPlayerIdx === 0) ? 'inline-block' : 'none';
         document.getElementById('host-waiting-msg').style.display = (myPlayerIdx !== 0) ? 'block' : 'none';
     } else {
@@ -351,35 +383,38 @@ function render(state) {
 }
 
 function renderTable(state) {
-    document.getElementById('pot-amount').textContent = state.pot;
     const me = state.players[myPlayerIdx];
+    document.getElementById('pot-amount').textContent = state.pot;
+    document.getElementById('display-room-code').textContent = myRoomId;
+    document.getElementById('player-count-display').textContent = `${state.connectedCount}/${state.maxPlayers}`;
 
     // Timer & Hand Strength
-    if (state.currentPlayer === myPlayerIdx) playSound('alert');
     const strengthEl = document.getElementById('hand-strength');
-    if (!me.folded && state.community.length >= 3) {
-        strengthEl.textContent = `Hand: ${getHandName(getBestHand([...me.cards, ...state.community]).type)}`;
+    if (!me.folded && state.community.length >= 0 && state.status === 'playing') {
+        const best = getBestHand([...me.cards, ...state.community]);
+        strengthEl.textContent = `Current Hand: ${getHandName(best.type)}`;
     } else strengthEl.textContent = "";
 
     // Opponents
-    const container = document.getElementById('opponents-container');
-    container.innerHTML = '';
+    const oppCont = document.getElementById('opponents-container');
+    oppCont.innerHTML = '';
     state.players.forEach((p, i) => {
         if (i === myPlayerIdx) renderMe(p, state);
         else {
             const div = document.createElement('div');
             div.className = `player-area ${state.currentPlayer === i ? 'active-turn' : ''}`;
-            div.setAttribute('data-idx', i);
             const isWinner = p.winningHand;
             div.innerHTML = `
-                <div class="cards">${p.cards.map((c, ci) => {
-                const highlight = isWinner && isWinner.some(wc => wc.rank === c.rank && wc.suit === c.suit) ? 'winner-highlight' : '';
-                return `<div class="card ${state.phase === 'showdown' ? 'revealed' : ''} ${highlight}"><div class="card-face card-back"></div><div class="card-face card-front ${c.suit}">${c.rank}</div></div>`;
-            }).join('')}</div>
+                ${state.currentPlayer === i ? `<div class="timer-circle">${Math.max(0, Math.ceil((state.turnEndTime - Date.now()) / 1000))}</div>` : ''}
+                <div class="status-bubble">${p.status || ''}</div>
+                <div class="cards">${p.cards.map(c => `
+                    <div class="card ${state.phase === 'showdown' ? 'revealed' : ''} ${isWinner && isWinner.some(wc => wc.rank === c.rank && wc.suit === c.suit) ? 'winner-highlight' : ''}">
+                        <div class="card-face card-back"></div>
+                        <div class="card-face card-front ${c.suit}">${c.rank}</div>
+                    </div>`).join('')}</div>
                 <div class="player-info"><div class="avatar">${p.avatar}</div><div class="details"><span>${p.name}</span><span class="chips">$${p.chips}</span></div></div>
-                ${state.currentPlayer === i ? `<div class="timer-circle"></div>` : ''}
             `;
-            container.appendChild(div);
+            oppCont.appendChild(div);
         }
     });
 
@@ -388,103 +423,189 @@ function renderTable(state) {
     board.innerHTML = state.community.map(c => `<div class="card revealed"><div class="card-face card-back"></div><div class="card-face card-front ${c.suit}">${c.rank}</div></div>`).join('') + Array(5 - state.community.length).fill('<div class="card-slot"></div>').join('');
 
     // Controls
-    const controls = document.getElementById('controls');
-    controls.style.display = (state.currentPlayer === myPlayerIdx) ? 'block' : 'none';
+    document.getElementById('controls').style.display = (state.currentPlayer === myPlayerIdx) ? 'block' : 'none';
     const toCall = state.currentBet - me.bet;
     document.querySelector('.call').textContent = toCall > 0 ? `Call ${toCall}` : 'Check';
-    document.getElementById('betting-shortcuts').style.display = 'flex';
+    document.getElementById('betting-shortcuts').style.display = (toCall > 0 || state.currentBet === 0) ? 'flex' : 'none';
+
+    // Showdown Overlay
+    if (state.phase === 'finished') {
+        document.getElementById('game-overlay').style.display = 'flex';
+        document.getElementById('overlay-msg').textContent = state.message;
+    } else document.getElementById('game-overlay').style.display = 'none';
+
+    if (state.isGameOver) {
+        document.getElementById('tournament-over-overlay').style.display = 'flex';
+        document.getElementById('tournament-champ-name').textContent = state.message;
+    }
 }
 
 function renderMe(p, state) {
     const area = document.getElementById('player-area');
     area.className = `player-area me ${state.currentPlayer === myPlayerIdx ? 'active-turn' : ''}`;
-    const cardsEl = document.getElementById('player-cards');
-    cardsEl.innerHTML = p.cards.map(c => `<div class="card revealed"><div class="card-face card-back"></div><div class="card-face card-front ${c.suit}">${c.rank}</div></div>`).join('');
     area.querySelector('.chips').textContent = `$${p.chips}`;
+    area.querySelector('.name').textContent = p.name;
+    document.getElementById('player-bet').textContent = p.bet > 0 ? `$${p.bet}` : '';
+    document.getElementById('player-status').textContent = p.status || '';
+
+    document.getElementById('player-cards').innerHTML = p.cards.map(c => {
+        const highlight = p.winningHand && p.winningHand.some(wc => wc.rank === c.rank && wc.suit === c.suit) ? 'winner-highlight' : '';
+        return `<div class="card revealed ${highlight}"><div class="card-face card-back"></div><div class="card-face card-front ${c.suit}">${c.rank}</div></div>`;
+    }).join('');
+
     if (state.currentPlayer === myPlayerIdx) {
         let t = area.querySelector('.timer-circle');
         if (!t) { t = document.createElement('div'); t.className = 'timer-circle'; area.appendChild(t); }
-        const left = Math.max(0, Math.ceil((state.turnEndTime - Date.now()) / 1000));
-        t.textContent = left;
+        t.textContent = Math.max(0, Math.ceil((state.turnEndTime - Date.now()) / 1000));
     }
 }
 
 // ============================================
-// FIREBASE SYNC
+// DROPDOWN & PERSISTENCE (Restored)
 // ============================================
-async function joinRoom(roomId, name) {
-    const roomRef = ref(database, 'rooms/' + roomId);
+function initDropdown() {
+    const list = document.getElementById('custom-name-list');
+    onValue(ref(database, 'playerNames/'), (snap) => {
+        list.innerHTML = '';
+        if (snap.exists()) {
+            Object.values(snap.val()).forEach(name => {
+                const div = document.createElement('div');
+                div.textContent = name;
+                div.onclick = () => { document.getElementById('player-name').value = name; list.style.display = 'none'; };
+                list.appendChild(div);
+            });
+        }
+    });
+    document.getElementById('btn-toggle-names').onclick = () => list.style.display = list.style.display === 'none' ? 'block' : 'none';
+}
+
+async function saveNameLocally(name) {
+    const key = name.replace(/[.#$/\[\]]/g, "");
+    if (key) await set(ref(database, 'playerNames/' + key), name);
+}
+
+// ============================================
+// MAIN EVENT LOOPS
+// ============================================
+document.getElementById('btn-create').onclick = async () => {
+    const name = document.getElementById('player-name').value || "Host";
+    const count = parseInt(document.getElementById('player-count').value);
+    const id = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const state = createNewGame(count);
+    state.players[0].connected = true; state.players[0].name = name;
+    state.connectedCount = 1; myRoomId = id; myPlayerIdx = 0;
+    if (document.getElementById('save-name-default').checked) saveNameLocally(name);
+    await set(ref(database, 'rooms/' + id), state);
+    onValue(ref(database, 'rooms/' + id), (s) => { if (s.exists()) render(s.val()); });
+};
+
+document.getElementById('btn-join').onclick = async () => {
+    const id = document.getElementById('inp-room-code').value.toUpperCase();
+    const name = document.getElementById('player-name').value || "Player";
+    const roomRef = ref(database, 'rooms/' + id);
     const snap = await get(roomRef);
     if (!snap.exists()) return alert("Room not found");
     const state = snap.val();
     const idx = state.players.findIndex(p => !p.connected);
     if (idx === -1) return alert("Room full");
-
-    myPlayerIdx = idx; myRoomId = roomId;
-    state.players[idx].connected = true;
-    state.players[idx].name = name || `Player ${idx + 1}`;
-    state.connectedCount++;
+    state.players[idx].connected = true; state.players[idx].name = name;
+    state.connectedCount++; myRoomId = id; myPlayerIdx = idx;
+    if (document.getElementById('save-name-default').checked) saveNameLocally(name);
     await set(roomRef, state);
-
     onValue(roomRef, (s) => { if (s.exists()) render(s.val()); });
-}
-
-// Event Listeners
-document.getElementById('btn-create').onclick = async () => {
-    const name = document.getElementById('player-name').value;
-    const count = parseInt(document.getElementById('player-count').value);
-    const id = Math.random().toString(36).substring(2, 7).toUpperCase();
-    const state = createNewGame(count);
-    state.players[0].connected = true; state.players[0].name = name || "Host";
-    state.connectedCount = 1;
-    myRoomId = id; myPlayerIdx = 0;
-    await set(ref(database, 'rooms/' + id), state);
-    onValue(ref(database, 'rooms/' + id), (s) => { if (s.exists()) render(s.val()); });
-};
-
-document.getElementById('btn-join').onclick = () => {
-    const code = document.getElementById('inp-room-code').value;
-    const name = document.getElementById('player-name').value;
-    joinRoom(code, name);
 };
 
 document.getElementById('btn-start-game').onclick = async () => {
     const roomRef = ref(database, 'rooms/' + myRoomId);
-    const snap = await get(roomRef);
-    const state = dealCards(snap.val());
+    const state = (await get(roomRef)).val();
     state.status = 'playing';
-    await set(roomRef, state);
+    await set(roomRef, dealCards(state));
 };
 
+document.querySelectorAll('.btn-action').forEach(btn => {
+    btn.onclick = async () => {
+        const action = btn.dataset.action;
+        const snap = await get(ref(database, 'rooms/' + myRoomId));
+        const state = snap.val();
+        if (action === 'raise') {
+            document.getElementById('raise-slider-container').style.display = 'flex';
+            const me = state.players[myPlayerIdx];
+            const toCall = state.currentBet - me.bet;
+            document.getElementById('raise-slider').max = me.chips - toCall;
+            document.getElementById('raise-slider').value = state.minRaise;
+            document.getElementById('raise-val').value = state.minRaise;
+            return;
+        }
+        await set(ref(database, 'rooms/' + myRoomId), handleAction(state, myPlayerIdx, action));
+    };
+});
+
+// Local Timer Tick (Restored)
+setInterval(() => {
+    const timerCircle = document.querySelector('.player-area.active-turn .timer-circle');
+    if (timerCircle) {
+        const current = parseInt(timerCircle.textContent);
+        if (current > 0) timerCircle.textContent = current - 1;
+    }
+}, 1000);
+
+document.getElementById('btn-confirm-raise').onclick = async () => {
+    const amt = parseInt(document.getElementById('raise-val').value);
+    const state = (await get(ref(database, 'rooms/' + myRoomId))).val();
+    document.getElementById('raise-slider-container').style.display = 'none';
+    await set(ref(database, 'rooms/' + myRoomId), handleAction(state, myPlayerIdx, 'raise', amt));
+};
+
+document.getElementById('btn-reset-game').onclick = async () => {
+    const id = myRoomId;
+    const snap = await get(ref(database, 'rooms/' + id));
+    const state = createNewGame(snap.val().maxPlayers);
+    // Keep connected players but reset chips? Or just full reset?
+    // Usually a tournament reset means new chips for all.
+    state.status = 'waiting';
+    await set(ref(database, 'rooms/' + id), state);
+    location.reload(); // Simplest way to reset lobby state
+};
+
+document.getElementById('btn-back-lobby').onclick = () => location.reload();
+
+document.getElementById('btn-next-hand').onclick = async () => {
+    const roomRef = ref(database, 'rooms/' + myRoomId);
+    const state = (await get(roomRef)).val();
+    state.dealer = (state.dealer + 1) % state.players.length;
+    await set(roomRef, dealCards(state));
+};
+
+// Shortcuts
 document.querySelectorAll('.btn-shortcut').forEach(btn => {
     btn.onclick = async () => {
-        const roomRef = ref(database, 'rooms/' + myRoomId);
-        const snap = await get(roomRef);
-        const state = snap.val();
-        const me = state.players[myPlayerIdx];
+        const state = (await get(ref(database, 'rooms/' + myRoomId))).val();
         const mult = btn.dataset.mult;
-        const action = btn.dataset.action;
-
-        if (action === 'allin') {
-            await set(roomRef, handleAction(state, myPlayerIdx, 'allin'));
-        } else if (mult) {
-            const amount = Math.floor(state.pot * parseFloat(mult));
-            document.getElementById('raise-slider').value = amount;
-            document.getElementById('raise-val').value = amount;
-            // Optionally just trigger the raise
-            const toCall = state.currentBet - me.bet;
-            const raiseAmt = amount - toCall;
-            if (raiseAmt > 0) await set(roomRef, handleAction(state, myPlayerIdx, 'raise', raiseAmt));
+        if (btn.dataset.action === 'allin') await set(ref(database, 'rooms/' + myRoomId), handleAction(state, myPlayerIdx, 'allin'));
+        else {
+            const amt = Math.floor(state.pot * parseFloat(mult));
+            await set(ref(database, 'rooms/' + myRoomId), handleAction(state, myPlayerIdx, 'raise', amt));
         }
     };
 });
 
-document.querySelectorAll('.btn-action').forEach(btn => {
-    btn.onclick = async () => {
-        const action = btn.dataset.action || btn.className.split(' ').pop();
-        const roomRef = ref(database, 'rooms/' + myRoomId);
-        const snap = await get(roomRef);
-        const newState = handleAction(snap.val(), myPlayerIdx, action);
-        await set(roomRef, newState);
-    };
-});
+// Modals
+document.getElementById('btn-open-guide').onclick = () => document.getElementById('modal-guide').style.display = 'flex';
+document.getElementById('btn-show-stats').onclick = async () => {
+    const name = document.getElementById('player-name').value;
+    if (!name) return alert("Enter a name to view stats");
+    const key = name.replace(/[.#$/\[\]]/g, "");
+    const snap = await get(ref(database, 'playerStats/' + key));
+    const stats = snap.val() || { wins: 0, handsPlayed: 0, bestHandType: -1 };
+
+    document.getElementById('modal-stats').style.display = 'flex';
+    document.getElementById('stats-name').textContent = name;
+    document.getElementById('stats-played').textContent = stats.handsPlayed;
+    document.getElementById('stats-wins').textContent = stats.wins;
+    document.getElementById('stats-rate').textContent = stats.handsPlayed > 0 ? Math.round((stats.wins / stats.handsPlayed) * 100) + "%" : "0%";
+    document.getElementById('stats-best').textContent = getHandName(stats.bestHandType);
+};
+document.querySelectorAll('.btn-close-modal').forEach(b => b.onclick = () => b.closest('.modal-overlay').style.display = 'none');
+
+initMusic();
+initDropdown();
