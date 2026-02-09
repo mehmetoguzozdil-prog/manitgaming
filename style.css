@@ -727,9 +727,22 @@ input {
 
 .hands-list li span {
     color: #aeaeae;
-    font-family: monospace;
+    font-family: 'Courier New', Courier, monospace;
     font-size: 0.85rem;
+    background: #000;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid #444;
 }
+
+.card-red {
+    color: #ff4d4d !important;
+}
+
+.card-black {
+    color: #ffffff !important;
+}
+
 
 .stats-grid {
     display: grid;

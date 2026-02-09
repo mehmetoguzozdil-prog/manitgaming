@@ -112,6 +112,7 @@
                     <button class="btn-action raise" data-action="raise">Raise</button>
                 </div>
                 <div class="slider-container" id="raise-slider-container" style="display:none;">
+                    <span id="slider-label" style="font-size: 0.8rem; color: #ccc;">Raise by:</span>
                     <input type="range" id="raise-slider" min="0" max="1000" step="1">
                     <input type="number" id="raise-val" value="0" min="0">
                     <button id="btn-confirm-raise">Bet</button>
@@ -149,16 +150,36 @@
         <div class="modal-content">
             <h3>Poker Hands Rank</h3>
             <ul class="hands-list">
-                <li><strong>Royal Flush</strong> <span>[A♠ K♠ Q♠ J♠ 10♠]</span></li>
-                <li><strong>Straight Flush</strong> <span>[9♥ 8♥ 7♥ 6♥ 5♥]</span></li>
-                <li><strong>Four of a Kind</strong> <span>[A♠ A♥ A♣ A♦ 5♠]</span></li>
-                <li><strong>Full House</strong> <span>[K♠ K♥ K♣ 2♠ 2♥]</span></li>
-                <li><strong>Flush</strong> <span>[A♦ J♦ 8♦ 6♦ 2♦]</span></li>
-                <li><strong>Straight</strong> <span>[9♠ 8♥ 7♣ 6♦ 5♠]</span></li>
-                <li><strong>Three of a Kind</strong> <span>[7♠ 7♥ 7♣ A♠ K♥]</span></li>
-                <li><strong>Two Pair</strong> <span>[J♠ J♥ 4♠ 4♥ K♣]</span></li>
-                <li><strong>One Pair</strong> <span>[10♠ 10♥ A♠ K♣ 8♦]</span></li>
-                <li><strong>High Card</strong> <span>[A♠ J♥ 8♣ 4♦ 2♠]</span></li>
+                <li><strong>Royal Flush</strong> <span>[A<span class="card-black">♠</span> K<span
+                            class="card-black">♠</span> Q<span class="card-black">♠</span> J<span
+                            class="card-black">♠</span> 10<span class="card-black">♠</span>]</span></li>
+                <li><strong>Straight Flush</strong> <span>[9<span class="card-red">♥</span> 8<span
+                            class="card-red">♥</span> 7<span class="card-red">♥</span> 6<span class="card-red">♥</span>
+                        5<span class="card-red">♥</span>]</span></li>
+                <li><strong>Four of a Kind</strong> <span>[A<span class="card-black">♠</span> A<span
+                            class="card-red">♥</span> A<span class="card-black">♣</span> A<span
+                            class="card-red">♦</span> 5<span class="card-black">♠</span>]</span></li>
+                <li><strong>Full House</strong> <span>[K<span class="card-black">♠</span> K<span
+                            class="card-red">♥</span> K<span class="card-black">♣</span> 2<span
+                            class="card-black">♠</span> 2<span class="card-red">♥</span>]</span></li>
+                <li><strong>Flush</strong> <span>[A<span class="card-red">♦</span> J<span class="card-red">♦</span>
+                        8<span class="card-red">♦</span> 6<span class="card-red">♦</span> 2<span
+                            class="card-red">♦</span>]</span></li>
+                <li><strong>Straight</strong> <span>[9<span class="card-black">♠</span> 8<span class="card-red">♥</span>
+                        7<span class="card-black">♣</span> 6<span class="card-red">♦</span> 5<span
+                            class="card-black">♠</span>]</span></li>
+                <li><strong>Three of a Kind</strong> <span>[7<span class="card-black">♠</span> 7<span
+                            class="card-red">♥</span> 7<span class="card-black">♣</span> A<span
+                            class="card-black">♠</span> K<span class="card-red">♥</span>]</span></li>
+                <li><strong>Two Pair</strong> <span>[J<span class="card-black">♠</span> J<span class="card-red">♥</span>
+                        4<span class="card-black">♠</span> 4<span class="card-red">♥</span> K<span
+                            class="card-black">♣</span>]</span></li>
+                <li><strong>One Pair</strong> <span>[10<span class="card-black">♠</span> 10<span
+                            class="card-red">♥</span> A<span class="card-black">♠</span> K<span
+                            class="card-black">♣</span> 8<span class="card-red">♦</span>]</span></li>
+                <li><strong>High Card</strong> <span>[A<span class="card-black">♠</span> J<span
+                            class="card-red">♥</span> 8<span class="card-black">♣</span> 4<span
+                            class="card-red">♦</span> 2<span class="card-black">♠</span>]</span></li>
             </ul>
             <button class="btn-close-modal">Close</button>
         </div>

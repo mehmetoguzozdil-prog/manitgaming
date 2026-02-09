@@ -259,7 +259,119 @@ function nextActivePlayer(state, fromIdx) {
 }
 
 function activePlayers(state) {
-    return state.players.filter(p => p.connected && !p.folded);
+    return state.players.filter(p => p.connected && !p.folded && !p.bankrupt);
+}
+
+function showdown(state) {
+    state.phase = 'showdown';
+    console.log("SHOWDOWN!");
+
+    const contenders = activePlayers(state);
+    if (contenders.length === 1) {
+        return endHand(state, contenders[0].id);
+    }
+
+    // Evaluate hands
+    let bestHand = null;
+    let winners = [];
+
+    for (const p of contenders) {
+        const allCards = [...p.cards, ...state.community];
+        const hand = getBestHand(allCards);
+
+        if (!bestHand || compareHands(hand, bestHand) > 0) {
+            bestHand = hand;
+            winners = [p];
+        } else if (compareHands(hand, bestHand) === 0) {
+            winners.push(p);
+        }
+    }
+
+    // Distribute pot
+    const share = Math.floor(state.pot / winners.length);
+    winners.forEach(w => w.chips += share);
+
+    state.winner = winners.length === 1 ? winners[0].id : 'split';
+
+    // Create detailed message with hand name
+    let winMsg = "";
+    if (winners.length === 1) {
+        winMsg = `${winners[0].name} wins with ${getHandName(bestHand.type)}!`;
+    } else {
+        winMsg = `Split pot! (${getHandName(bestHand.type)})`;
+    }
+
+    state.message = winMsg;
+    state.phase = 'finished';
+
+    // Record stats for all active players - FIX: await this!
+    recordPlayerStats(state, contenders, winners, bestHand);
+
+    return state;
+}
+
+async function recordPlayerStats(state, players, winners, bestHand) {
+    try {
+        const db = getDB();
+        for (const p of players) {
+            if (!p.name || p.name === "You") continue;
+            const key = p.name.replace(/[.#$/\[\]]/g, "");
+            const statsRef = ref(db, 'playerStats/' + key);
+            const snap = await get(statsRef);
+            let stats = snap.val() || { wins: 0, handsPlayed: 0, bestHandType: -1 };
+
+            stats.handsPlayed++;
+
+            const isWinner = winners.some(w => w.id === p.id);
+            if (isWinner) {
+                stats.wins++;
+            }
+
+            // Record best hand personal record
+            const allCards = [...p.cards, ...state.community];
+            const personalHand = getBestHand(allCards);
+            if (personalHand.type > (stats.bestHandType || -1)) {
+                stats.bestHandType = personalHand.type;
+            }
+
+            await set(statsRef, stats);
+        }
+    } catch (e) {
+        console.error("Failed to record stats:", e);
+    }
+}
+
+
+function endHand(state, winnerId) {
+    const winner = state.players.find(p => p.id === winnerId);
+    if (winner) {
+        winner.chips += state.pot;
+        state.message = `${winner.name} wins the pot!`;
+    }
+    state.pot = 0;
+    state.winner = winnerId;
+    state.phase = 'finished';
+
+    // Bankruptcy check
+    state.players.forEach(p => {
+        if (p.chips <= 0) {
+            p.bankrupt = true;
+            p.chips = 0;
+        }
+    });
+
+    // Tournament Over check
+    const alive = state.players.filter(p => !p.bankrupt && p.connected);
+    if (alive.length <= 1) {
+        state.isGameOver = true;
+        const champ = alive[0];
+        state.message = champ
+            ? `🏆 TOURNAMENT OVER! ${champ.name} is the CHAMPION! 🏆`
+            : "GAME OVER! No one has chips left.";
+        state.status = 'finished';
+    }
+
+    return state;
 }
 
 function activeNonAllIn(state) {
@@ -316,36 +428,31 @@ function handlePlayerAction(state, playerIdx, action, amount = 0) {
         state.actedThisRound++; // Player has acted
     }
     else if (action === 'raise') {
-        if (amount <= state.currentBet) {
-            console.log("Raise must be more than current bet");
-            return state;
-        }
+        // 'amount' here is now interpreted as "Relative Raise" (how much to ADD to the pot on top of calling)
+        const toCall = state.currentBet - player.bet;
+        const totalNeeded = toCall + amount; // The chips the player is putting in this turn
 
-        // Allow smaller raises per user request
-        const totalNeeded = amount - player.bet; // Amount adding to pot
-        const raiseSize = amount - state.currentBet; // The actual raise amount over previous high bet
-
-        // Enforce a minimum raise of 1 chip (or whatever user wants)
-        if (raiseSize < 1) {
-            console.log("Raise must be at least 1");
+        if (amount < 1 && player.chips > toCall) {
+            console.log("Raise amount must be at least 1");
             return state;
         }
 
         if (totalNeeded > player.chips) {
-            console.log("Not enough chips");
+            console.log("Not enough chips for this raise");
             return state;
         }
+
+        const newTotalBet = player.bet + totalNeeded;
+
         player.chips -= totalNeeded;
-        player.bet = amount;
+        player.bet = newTotalBet;
         state.pot += totalNeeded;
-        state.currentBet = amount;
-        state.minRaise = 1; // Keeping min raise small as requested
+        state.currentBet = newTotalBet;
         state.lastRaise = playerIdx;
         player.allIn = player.chips === 0;
-        state.message = `${player.name} raises to ${amount}`;
+        state.message = `${player.name} raises by ${amount} to ${newTotalBet}`;
 
-        // Reset action counter because a raise re-opens betting for everyone else
-        // The raiser has acted, so count starts at 1
+        // Reset action counter for everyone else
         state.actedThisRound = 1;
     }
     else if (action === 'allin') {
@@ -482,98 +589,7 @@ function advancePhase(state) {
     }
 }
 
-function showdown(state) {
-    state.phase = 'showdown';
-    console.log("SHOWDOWN!");
 
-    const contenders = activePlayers(state);
-    if (contenders.length === 1) {
-        return endHand(state, contenders[0].id);
-    }
-
-    // Evaluate hands
-    let bestHand = null;
-    let winners = [];
-
-    for (const p of contenders) {
-        const allCards = [...p.cards, ...state.community];
-        const hand = getBestHand(allCards);
-
-        if (!bestHand || compareHands(hand, bestHand) > 0) {
-            bestHand = hand;
-            winners = [p];
-        } else if (compareHands(hand, bestHand) === 0) {
-            winners.push(p);
-        }
-    }
-
-    // Distribute pot
-    const share = Math.floor(state.pot / winners.length);
-    winners.forEach(w => w.chips += share);
-
-    state.winner = winners.length === 1 ? winners[0].id : 'split';
-
-    // Create detailed message with hand name
-    let winMsg = "";
-    if (winners.length === 1) {
-        winMsg = `${winners[0].name} wins with ${getHandName(bestHand.type)}!`;
-    } else {
-        winMsg = `Split pot! (${getHandName(bestHand.type)})`;
-    }
-
-    state.message = winMsg;
-    state.phase = 'finished';
-
-    // Record stats for all active players
-    recordPlayerStats(state, contenders, winners, bestHand);
-
-    return state;
-}
-
-async function recordPlayerStats(state, players, winners, bestHand) {
-    try {
-        const db = getDB();
-        for (const p of players) {
-            if (!p.name) continue;
-            const key = p.name.replace(/[.#$/\[\]]/g, "");
-            const statsRef = ref(db, 'playerStats/' + key);
-            const snap = await get(statsRef);
-            let stats = snap.val() || { wins: 0, handsPlayed: 0, bestHandType: -1 };
-
-            stats.handsPlayed++;
-
-            const isWinner = winners.some(w => w.id === p.id);
-            if (isWinner) {
-                stats.wins++;
-            }
-
-            // Record best hand personal record
-            const allCards = [...p.cards, ...state.community];
-            const personalHand = getBestHand(allCards);
-            if (personalHand.type > (stats.bestHandType || -1)) {
-                stats.bestHandType = personalHand.type;
-            }
-
-            await set(statsRef, stats);
-        }
-    } catch (e) {
-        console.error("Failed to record stats:", e);
-    }
-}
-
-
-function endHand(state, winnerId) {
-    const winner = state.players.find(p => p.id === winnerId);
-    if (winner) {
-        winner.chips += state.pot;
-        state.message = `${winner.name} wins the pot!`;
-    }
-    state.pot = 0;
-    state.winner = winnerId;
-    state.phase = 'finished';
-    state.dealer = (state.dealer + 1) % state.players.length;
-    return state;
-}
 
 function startNewHand(state) {
     state.dealer = (state.dealer + 1) % state.players.length;
@@ -1022,10 +1038,16 @@ const sliderContainer = document.getElementById('raise-slider-container');
 const slider = document.getElementById('raise-slider');
 const raiseVal = document.getElementById('raise-val');
 const btnConfirmRaise = document.getElementById('btn-confirm-raise');
+const sliderLabel = document.getElementById('slider-label');
 
 function doAction(action) {
     if (!gameState) return;
     const me = gameState.players[myPlayerIdx];
+
+    // Find the maximum chips any other active player has
+    const others = gameState.players.filter((p, idx) => idx !== myPlayerIdx && !p.folded && !p.bankrupt);
+    const maxOppStack = others.length > 0 ? Math.max(...others.map(p => p.chips)) : 0;
+    const currentMaxBet = gameState.currentBet;
 
     if (action === 'raise') {
         if (sliderContainer.style.display === 'flex') {
@@ -1033,13 +1055,26 @@ function doAction(action) {
             return;
         }
 
-        const minBet = gameState.currentBet + 1; // Allow raise by 1
-        const maxBet = me.chips + me.bet;
+        const toCall = gameState.currentBet - me.bet;
+        const minAdd = 1;
+        // User rule: Can't bet more than opponents have
+        const maxAdd = Math.min(me.chips - toCall, maxOppStack);
 
-        slider.min = Math.min(minBet, maxBet);
-        slider.max = maxBet;
-        slider.value = slider.min;
-        raiseVal.value = slider.min;
+        if (maxAdd < 1) {
+            if (me.chips > toCall) {
+                // Should not happen if logic is correct, but just in case
+                sendPlayerAction(myRoomId, myPlayerIdx, 'allin', 0);
+            } else {
+                sendPlayerAction(myRoomId, myPlayerIdx, 'call', 0);
+            }
+            return;
+        }
+
+        slider.min = minAdd;
+        slider.max = maxAdd;
+        slider.value = minAdd;
+        raiseVal.value = minAdd;
+        sliderLabel.textContent = "Raise by:";
         sliderContainer.style.display = 'flex';
         return;
     }
