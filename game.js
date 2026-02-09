@@ -44,7 +44,7 @@ const BLIND_INCREASE_EVERY = 5; // hands
 const BLIND_MULTIPLIER = 2;
 
 // Turn timer (auto-fold on timeout, client-side only)
-const TURN_SECONDS = 25;
+const TURN_SECONDS = 90;
 
 // ============================================
 // DECK & CARDS
@@ -923,7 +923,28 @@ const playerCountDisplay = document.getElementById("player-count-display");
 const opponentsContainer = document.getElementById("opponents-container");
 const boardEl = document.getElementById("board");
 const potEl = document.getElementById("pot-amount");
+let sfxUnlocked = false;
 
+function unlockSfxOnce() {
+  if (sfxUnlocked) return;
+  sfxUnlocked = true;
+
+  ["sfx-chip", "sfx-card", "sfx-win"].forEach((id) => {
+    const a = document.getElementById(id);
+    if (!a) return;
+    a.muted = true;
+    a.play().then(() => {
+      a.pause();
+      a.currentTime = 0;
+      a.muted = false;
+    }).catch(() => {
+      // ignore - some browsers still block until a more direct interaction
+      a.muted = false;
+    });
+  });
+}
+
+document.addEventListener("pointerdown", unlockSfxOnce, { once: true });
 // Lobby
 const inpPlayerName = document.getElementById("player-name");
 const chkSaveName = document.getElementById("save-name-default");
